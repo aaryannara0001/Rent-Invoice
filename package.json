@@ -1,0 +1,19 @@
+{
+  "name": "rent-invoice-monorepo",
+  "version": "1.0.0",
+  "description": "Monorepo for Rent Invoice application",
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "frontend": "cd frontend && npm run dev",
+    "backend": "cd backend && npm run start",
+    "build": "cd frontend && npm run build",
+    "test": "cd frontend && npm run test"
+  },
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "keywords": ["react", "vite", "typescript", "monorepo"],
+  "author": "",
+  "license": "ISC"
+}
