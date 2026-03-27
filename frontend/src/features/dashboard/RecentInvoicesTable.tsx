@@ -98,37 +98,45 @@ export function RecentInvoicesTable() {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="pb-3 text-left text-xs font-medium text-muted-foreground">Invoice</th>
-              <th className="pb-3 text-left text-xs font-medium text-muted-foreground">Customer</th>
-              <th className="pb-3 text-left text-xs font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort("amount")}>
-                <span className="inline-flex items-center gap-1">Amount <ArrowUpDown className="h-3 w-3" /></span>
-              </th>
-              <th className="pb-3 text-left text-xs font-medium text-muted-foreground">Status</th>
-              <th className="pb-3 text-left text-xs font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort("date")}>
-                <span className="inline-flex items-center gap-1">Date <ArrowUpDown className="h-3 w-3" /></span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((inv) => (
-              <tr key={inv.id} className="border-b border-border/50 transition-colors hover:bg-secondary/30">
-                <td className="py-3.5 text-sm font-medium text-foreground">{inv.id}</td>
-                <td className="py-3.5 text-sm text-muted-foreground">{inv.customer}</td>
-                <td className="py-3.5 text-sm font-medium text-foreground">${inv.amount.toLocaleString()}</td>
-                <td className="py-3.5">
-                  <Badge variant="outline" className={`text-xs ${statusColors[inv.status]}`}>
-                    {inv.status}
-                  </Badge>
-                </td>
-                <td className="py-3.5 text-sm text-muted-foreground">{inv.date}</td>
+      <div className="overflow-x-auto -mx-6 sm:mx-0">
+        <div className="inline-block min-w-full align-middle">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-white/5">
+                <th className="pb-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-6 first:pl-0">Invoice</th>
+                <th className="pb-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-6">Customer</th>
+                <th className="pb-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-6 cursor-pointer select-none group" onClick={() => toggleSort("amount")}>
+                  <span className="inline-flex items-center gap-1.5 group-hover:text-foreground transition-colors">
+                    Amount 
+                    <ArrowUpDown className="h-3 w-3 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+                  </span>
+                </th>
+                <th className="pb-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-6">Status</th>
+                <th className="pb-4 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-6 last:pr-0 cursor-pointer select-none group" onClick={() => toggleSort("date")}>
+                  <span className="inline-flex items-center gap-1.5 group-hover:text-foreground transition-colors">
+                    Date 
+                    <ArrowUpDown className="h-3 w-3 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+                  </span>
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {filtered.map((inv) => (
+                <tr key={inv.id} className="group transition-colors hover:bg-white/[0.02]">
+                  <td className="py-4 text-sm font-medium text-white px-6 first:pl-0">{inv.id}</td>
+                  <td className="py-4 text-sm text-gray-400 px-6">{inv.customer}</td>
+                  <td className="py-4 text-sm font-semibold text-white px-6">${inv.amount.toLocaleString()}</td>
+                  <td className="py-4 px-6">
+                    <Badge variant="outline" className={`text-[10px] uppercase font-bold tracking-wider py-0 px-2 h-5 flex items-center w-fit ${statusColors[inv.status]}`}>
+                      {inv.status}
+                    </Badge>
+                  </td>
+                  <td className="py-4 text-sm text-gray-400 px-6 last:pr-0 text-right">{inv.date}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
