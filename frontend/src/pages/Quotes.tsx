@@ -158,23 +158,25 @@ const Quotes = () => {
 				{selectedQuotes.length > 0 && (
 					<Card className="bg-[#111827] border-[#1F2937]">
 						<CardContent className="p-4">
-							<div className="flex items-center gap-4 flex-wrap">
+							<div className="flex flex-col sm:flex-row sm:items-center gap-4">
 								<span className="text-gray-300">{selectedQuotes.length} selected</span>
-								<Select value="" onValueChange={(status) => handleBulkStatusChange(status)}>
-									<SelectTrigger className="w-48 bg-[#0B0F19] border-[#1F2937] text-gray-300">
-										<SelectValue placeholder="Change status..." />
-									</SelectTrigger>
-									<SelectContent className="bg-[#111827] border-[#1F2937]">
-										<SelectItem value="draft" className="text-gray-300">Draft</SelectItem>
-										<SelectItem value="sent" className="text-gray-300">Sent</SelectItem>
-										<SelectItem value="accepted" className="text-gray-300">Accepted</SelectItem>
-										<SelectItem value="rejected" className="text-gray-300">Rejected</SelectItem>
-									</SelectContent>
-								</Select>
-								<Button variant="outline" size="sm" className="bg-red-600 hover:bg-red-700 text-white border-red-600" onClick={handleBulkDelete}>
-									<Trash2 className="h-4 w-4 mr-2" />
-									Delete
-								</Button>
+								<div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+									<Select value="" onValueChange={(status) => handleBulkStatusChange(status)}>
+										<SelectTrigger className="w-full sm:w-48 bg-[#0B0F19] border-[#1F2937] text-gray-300">
+											<SelectValue placeholder="Change status..." />
+										</SelectTrigger>
+										<SelectContent className="bg-[#111827] border-[#1F2937]">
+											<SelectItem value="draft" className="text-gray-300">Draft</SelectItem>
+											<SelectItem value="sent" className="text-gray-300">Sent</SelectItem>
+											<SelectItem value="accepted" className="text-gray-300">Accepted</SelectItem>
+											<SelectItem value="rejected" className="text-gray-300">Rejected</SelectItem>
+										</SelectContent>
+									</Select>
+									<Button variant="outline" size="sm" className="bg-red-600 hover:bg-red-700 text-white border-red-600 w-full sm:w-auto">
+										<Trash2 className="h-4 w-4 mr-2" />
+										Delete
+									</Button>
+								</div>
 							</div>
 						</CardContent>
 					</Card>

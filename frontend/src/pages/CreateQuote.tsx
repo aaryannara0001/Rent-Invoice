@@ -1,23 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Save, Download, Eye, X } from 'lucide-react';
+import { ArrowLeft, Plus, Minus, Trash2, Save, Download, Eye, X, Package, Search, Check, ChevronsUpDown } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/utils/utils';
 import MainLayout from '@/layouts/MainLayout';
 import { useApp } from '@/context/useApp';
 import { toast } from 'sonner';
 import { Quote, RentalItem } from '@/context/types';
 import { generateQuotePDF } from '@/lib/pdfGenerator';
+import QuotePreview from '@/components/QuotePreview';
 
 const CreateQuote = () => {
 	const navigate = useNavigate();
 	const { id } = useParams();
-	const { quotes, customers, addQuote, updateQuote, getQuote, addCustomer } = useApp();
+	const { quotes, customers, addQuote, updateQuote, getQuote, addCustomer, masterItems } = useApp();
 	const [showPreview, setShowPreview] = useState(false);
 	const [showNewCustomer, setShowNewCustomer] = useState(false);
 	const [newCustomer, setNewCustomer] = useState({
@@ -59,6 +64,10 @@ const CreateQuote = () => {
 		status: 'draft',
 		notes: '',
 	});
+
+	const [showItemSelector, setShowItemSelector] = useState(false);
+	const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null);
+	const [itemSearchTerm, setItemSearchTerm] = useState('');
 
 	// Load quote if editing
 	useEffect(() => {
@@ -200,6 +209,42 @@ const CreateQuote = () => {
 		toast.success('Customer added successfully');
 	};
 
+	const handleSelectItemFromCatalog = (masterItem: any, indexOverride?: number) => {
+		const targetIndex = indexOverride !== undefined ? indexOverride : activeItemIndex;
+		if (targetIndex !== null) {
+			setQuoteData(prev => ({
+				...prev,
+				items: prev.items.map((item, index) => {
+					if (index === targetIndex) {
+						const updated = {
+							...item,
+							itemName: masterItem.name,
+							description: masterItem.description,
+							pricePerDay: masterItem.pricePerDay,
+							gstPercent: masterItem.gstPercent,
+						};
+						
+						// Recalculate item total
+						const itemSubtotal = updated.quantity * updated.days * updated.pricePerDay;
+						let discount = updated.discount;
+						if (updated.discountType === 'percent') {
+							discount = (itemSubtotal * updated.discount) / 100;
+						}
+						const afterDiscount = itemSubtotal - discount;
+						const gst = (afterDiscount * updated.gstPercent) / 100;
+						updated.total = afterDiscount + gst;
+						
+						return updated;
+					}
+					return item;
+				}),
+			}));
+			setShowItemSelector(false);
+			setActiveItemIndex(null);
+			toast.success(`Selected ${masterItem.name}`);
+		}
+	};
+
 	const handleSave = () => {
 		if (!quoteData.customerId) {
 			toast.error('Please select a customer');
@@ -279,11 +324,11 @@ const CreateQuote = () => {
 						</CardHeader>
 						<CardContent className="space-y-4">
 							<div>
-								<div className="flex items-center gap-2 mb-2">
+								<div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
 									<Label className="text-gray-300">Customer</Label>
 									<Button 
 										size="sm" 
-										className="bg-blue-600 hover:bg-blue-700 text-white ml-auto"
+										className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto sm:ml-auto"
 										onClick={() => setShowNewCustomer(true)}
 									>
 										<Plus className="h-4 w-4 mr-1" />
@@ -402,9 +447,14 @@ const CreateQuote = () => {
 						</CardHeader>
 						<CardContent className="space-y-4">
 							{quoteData.items.map((item, index) => (
-								<div key={item.id} className="border border-[#1F2937] rounded-lg p-4 space-y-4">
+								<div key={item.id} className="border border-[#1F2937] bg-[#0B0F19]/30 rounded-lg p-4 space-y-4 hover:border-blue-500/30 transition-colors group">
 									<div className="flex items-center justify-between">
-										<h4 className="text-white font-medium">Item {index + 1}</h4>
+										<div className="flex items-center gap-2">
+											<div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 font-bold text-xs">
+												{index + 1}
+											</div>
+											<h4 className="text-white font-medium">Item Details</h4>
+										</div>
 										{quoteData.items.length > 1 && (
 											<Button
 												variant="ghost"
@@ -418,13 +468,79 @@ const CreateQuote = () => {
 									</div>
 									<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 										<div>
-											<Label className="text-gray-300">Item Name</Label>
-											<Input
-												value={item.itemName}
-												onChange={(e) => updateItem(item.id, 'itemName', e.target.value)}
-												className="bg-[#0B0F19] border-[#1F2937] text-gray-300"
-												placeholder="e.g., Wedding Tent"
-											/>
+											<div className="flex items-center justify-between mb-2">
+												<Label className="text-gray-300">Item Name</Label>
+												<Button 
+													variant="ghost" 
+													size="sm" 
+													className="h-6 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 text-xs px-2"
+													onClick={() => {
+														setActiveItemIndex(index);
+														setShowItemSelector(true);
+													}}
+												>
+													<Search className="h-3 w-3 mr-1" />
+													Search Catalog
+												</Button>
+											</div>
+											<Popover>
+												<PopoverTrigger asChild>
+													<Button
+														variant="outline"
+														role="combobox"
+														className={cn(
+															"w-full justify-between bg-[#0B0F19] border-[#1F2937] text-gray-300 font-normal hover:bg-[#0B0F19] hover:text-gray-300",
+															!item.itemName && "text-gray-500"
+														)}
+													>
+														{item.itemName || "Select or type item..."}
+														<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+													</Button>
+												</PopoverTrigger>
+												<PopoverContent className="w-[300px] p-0 bg-[#111827] border-[#1F2937]">
+													<Command className="bg-transparent">
+														<CommandInput 
+															placeholder="Search catalog..." 
+															className="text-gray-300"
+															onValueChange={(val) => {
+																// Allow typing custom name
+																if (!masterItems.some(m => m.name === val)) {
+																	updateItem(item.id, 'itemName', val);
+																}
+															}}
+														/>
+														<CommandList>
+															<CommandEmpty>No item found. Type to add custom.</CommandEmpty>
+															<CommandGroup>
+																{masterItems.map((mItem) => (
+																	<CommandItem
+																		key={mItem.id}
+																		value={mItem.name}
+																		onSelect={(currentValue) => {
+																			const selected = masterItems.find(m => m.name === currentValue);
+																			if (selected) {
+																				handleSelectItemFromCatalog(selected, index);
+																			}
+																		}}
+																		className="text-gray-300 hover:bg-[#1F2937] cursor-pointer"
+																	>
+																		<Check
+																			className={cn(
+																				"mr-2 h-4 w-4",
+																				item.itemName === mItem.name ? "opacity-100" : "opacity-0"
+																			)}
+																		/>
+																		<div className="flex flex-col">
+																			<span>{mItem.name}</span>
+																			<span className="text-[10px] text-gray-500">₹{mItem.pricePerDay}/day - {mItem.category}</span>
+																		</div>
+																	</CommandItem>
+																))}
+															</CommandGroup>
+														</CommandList>
+													</Command>
+												</PopoverContent>
+											</Popover>
 										</div>
 										<div>
 											<Label className="text-gray-300">Description</Label>
@@ -436,23 +552,39 @@ const CreateQuote = () => {
 										</div>
 										<div>
 											<Label className="text-gray-300">Quantity</Label>
-											<Input
-												type="number"
-												value={item.quantity}
-												onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
-												className="bg-[#0B0F19] border-[#1F2937] text-gray-300"
-												min="1"
-											/>
+											<Select 
+												value={item.quantity.toString()} 
+												onValueChange={(val) => updateItem(item.id, 'quantity', parseInt(val) || 1)}
+											>
+												<SelectTrigger className="bg-[#0B0F19] border-[#1F2937] text-gray-300">
+													<SelectValue />
+												</SelectTrigger>
+												<SelectContent className="bg-[#111827] border-[#1F2937] max-h-[200px]">
+													{[...Array(100)].map((_, i) => (
+														<SelectItem key={i+1} value={(i+1).toString()} className="text-gray-300">
+															{i+1}
+														</SelectItem>
+													))}
+												</SelectContent>
+											</Select>
 										</div>
 										<div>
 											<Label className="text-gray-300">Days</Label>
-											<Input
-												type="number"
-												value={item.days}
-												onChange={(e) => updateItem(item.id, 'days', parseInt(e.target.value) || 1)}
-												className="bg-[#0B0F19] border-[#1F2937] text-gray-300"
-												min="1"
-											/>
+											<Select 
+												value={item.days.toString()} 
+												onValueChange={(val) => updateItem(item.id, 'days', parseInt(val) || 1)}
+											>
+												<SelectTrigger className="bg-[#0B0F19] border-[#1F2937] text-gray-300">
+													<SelectValue />
+												</SelectTrigger>
+												<SelectContent className="bg-[#111827] border-[#1F2937] max-h-[200px]">
+													{[...Array(100)].map((_, i) => (
+														<SelectItem key={i+1} value={(i+1).toString()} className="text-gray-300">
+															{i+1}
+														</SelectItem>
+													))}
+												</SelectContent>
+											</Select>
 										</div>
 										<div>
 											<Label className="text-gray-300">Price per Day (₹)</Label>
@@ -555,271 +687,36 @@ const CreateQuote = () => {
 					</Card>
 
 					{/* Actions */}
-					<div className="flex justify-end gap-4">
-						<Button variant="outline" onClick={() => navigate('/quotes')} className="border-[#1F2937] text-gray-300 hover:bg-[#1F2937]">
+					<div className="flex flex-col sm:flex-row sm:justify-end gap-4">
+						<Button variant="outline" onClick={() => navigate('/quotes')} className="border-[#1F2937] text-gray-300 hover:bg-[#1F2937] w-full sm:w-auto">
 							Cancel
 						</Button>
-						<Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white">
+						<Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto">
 							<Save className="h-4 w-4 mr-2" />
 							{id ? 'Update Quote' : 'Create Quote'}
 						</Button>
 					</div>
 				</div>
 
-				{/* Hidden Quote Preview for PDF */}
-				<div
-					id={`quote-${id || 'new'}`}
-					style={{ display: 'none' }}
-					className="p-12 bg-white text-black"
-				>
-					<div className="max-w-4xl mx-auto space-y-6">
-						{/* Header */}
-						<div className="flex justify-between items-start">
-							<div>
-								<h1 className="text-4xl font-bold">QUOTE</h1>
-								<p className="text-gray-600">{quoteData.quoteNumber}</p>
-							</div>
-							<div className="text-right">
-								<p className="font-semibold">Quote Date: {quoteData.quoteDate}</p>
-								<p className="font-semibold">Valid Until: {quoteData.validUntil}</p>
-							</div>
-						</div>
+			{/* Hidden Quote Preview for PDF - Using absolute positioning instead of hidden class to allow capture */}
+			<div 
+				className="absolute opacity-0 pointer-events-none" 
+				style={{ left: '-9999px', top: '-9999px', width: '210mm' }}
+			>
+				<QuotePreview quote={quoteData} id={id || 'new'} />
+			</div>
 
-						{/* From To */}
-						<div className="grid grid-cols-2 gap-8 py-6 border-t-2 border-b-2">
-							<div>
-								<p className="font-bold text-lg mb-2">From:</p>
-								<p className="text-gray-700">Your Company Name</p>
-								<p className="text-gray-700">Company Address</p>
-							</div>
-							<div>
-								<p className="font-bold text-lg mb-2">Quote For:</p>
-								<p className="font-semibold">{quoteData.customerName}</p>
-								<p className="text-gray-700">{quoteData.customerAddress}</p>
-								<p className="text-gray-700">{quoteData.customerEmail}</p>
-								<p className="text-gray-700">{quoteData.customerPhone}</p>
-								{quoteData.customerGstin && (
-									<p className="text-gray-700">GSTIN: {quoteData.customerGstin}</p>
-								)}
-							</div>
-						</div>
-
-						{/* Items Table */}
-						<div>
-							<table className="w-full border-collapse">
-								<thead>
-									<tr className="bg-gray-200">
-										<th className="border p-2 text-left">Item</th>
-										<th className="border p-2 text-center">Qty</th>
-										<th className="border p-2 text-center">Days</th>
-										<th className="border p-2 text-right">Price/Day</th>
-										<th className="border p-2 text-right">Discount</th>
-										<th className="border p-2 text-right">GST</th>
-										<th className="border p-2 text-right">Total</th>
-									</tr>
-								</thead>
-								<tbody>
-									{quoteData.items.map((item, idx) => (
-										<tr key={idx} className="border">
-											<td className="border p-2">
-												<p className="font-semibold">{item.itemName}</p>
-												<p className="text-sm text-gray-700">{item.description}</p>
-											</td>
-											<td className="border p-2 text-center">{item.quantity}</td>
-											<td className="border p-2 text-center">{item.days}</td>
-											<td className="border p-2 text-right">₹{item.pricePerDay.toFixed(2)}</td>
-											<td className="border p-2 text-right">
-												₹{item.discountType === 'percent'
-													? ((item.quantity * item.days * item.pricePerDay * item.discount) / 100).toFixed(2)
-													: item.discount.toFixed(2)}
-											</td>
-											<td className="border p-2 text-right">
-												₹{(
-													((item.quantity * item.days * item.pricePerDay -
-														(item.discountType === 'percent'
-															? (item.quantity * item.days * item.pricePerDay * item.discount) / 100
-															: item.discount)) *
-														item.gstPercent) /
-													100
-												).toFixed(2)}
-											</td>
-											<td className="border p-2 text-right font-semibold">₹{item.total.toFixed(2)}</td>
-										</tr>
-									))}
-								</tbody>
-							</table>
-						</div>
-
-						{/* Totals */}
-						<div className="flex justify-end">
-							<div className="w-64">
-								<div className="flex justify-between py-2 border-t-2">
-									<span>Subtotal:</span>
-									<span>₹{quoteData.subtotal.toFixed(2)}</span>
-								</div>
-								<div className="flex justify-between py-2">
-									<span>Total Discount:</span>
-									<span>-₹{quoteData.totalDiscount.toFixed(2)}</span>
-								</div>
-								<div className="flex justify-between py-2">
-									<span>Total GST:</span>
-									<span>₹{quoteData.totalGST.toFixed(2)}</span>
-								</div>
-								<div className="flex justify-between py-2 text-lg font-bold border-t-2 border-b-2">
-									<span>Grand Total:</span>
-									<span>₹{quoteData.grandTotal.toFixed(2)}</span>
-								</div>
-							</div>
-						</div>
-
-						{/* Notes */}
-						{quoteData.notes && (
-							<div className="border-t-2 pt-4">
-								<p className="font-bold">Notes:</p>
-								<p className="text-gray-700 whitespace-pre-wrap">{quoteData.notes}</p>
-							</div>
-						)}
-
-						{/* Footer */}
-						<div className="border-t-2 pt-4 text-center text-sm text-gray-600">
-							<p>Thank you for your interest!</p>
-						</div>
+			{/* Preview Modal */}
+			<Dialog open={showPreview} onOpenChange={setShowPreview}>
+				<DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-[#111827] border-[#1F2937]">
+					<DialogHeader className="sticky top-0 bg-[#111827] z-10 pr-10">
+						<DialogTitle className="text-white">Quote Preview</DialogTitle>
+					</DialogHeader>
+					<div className="mt-4">
+						<QuotePreview quote={quoteData} id={id || 'new'} />
 					</div>
-				</div>
-
-				{/* Preview Modal */}
-				<Dialog open={showPreview} onOpenChange={setShowPreview}>
-					<DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-[#111827] border-[#1F2937]">
-						<DialogHeader className="sticky top-0 bg-[#111827] z-10">
-							<div className="flex items-center justify-between">
-								<DialogTitle className="text-white">Quote Preview</DialogTitle>
-								<Button
-									variant="ghost"
-									size="sm"
-									onClick={() => setShowPreview(false)}
-									className="text-gray-400 hover:text-gray-300"
-								>
-									<X className="h-4 w-4" />
-								</Button>
-							</div>
-						</DialogHeader>
-						<div className="bg-white text-black rounded-lg p-8 mt-4">
-							<div className="max-w-4xl mx-auto space-y-6">
-								{/* Header */}
-								<div className="flex justify-between items-start">
-									<div>
-										<h1 className="text-4xl font-bold">QUOTE</h1>
-										<p className="text-gray-600">{quoteData.quoteNumber}</p>
-									</div>
-									<div className="text-right">
-										<p className="font-semibold">Quote Date: {quoteData.quoteDate}</p>
-										<p className="font-semibold">Valid Until: {quoteData.validUntil}</p>
-									</div>
-								</div>
-
-								{/* From To */}
-								<div className="grid grid-cols-2 gap-8 py-6 border-t-2 border-b-2">
-									<div>
-										<p className="font-bold text-lg mb-2">From:</p>
-										<p className="text-gray-700">Your Company Name</p>
-										<p className="text-gray-700">Company Address</p>
-									</div>
-									<div>
-										<p className="font-bold text-lg mb-2">Quote For:</p>
-										<p className="font-semibold">{quoteData.customerName}</p>
-										<p className="text-gray-700">{quoteData.customerAddress}</p>
-										<p className="text-gray-700">{quoteData.customerEmail}</p>
-										<p className="text-gray-700">{quoteData.customerPhone}</p>
-										{quoteData.customerGstin && (
-											<p className="text-gray-700">GSTIN: {quoteData.customerGstin}</p>
-										)}
-									</div>
-								</div>
-
-								{/* Items Table */}
-								<div>
-									<table className="w-full border-collapse">
-										<thead>
-											<tr className="bg-gray-200">
-												<th className="border p-2 text-left">Item</th>
-												<th className="border p-2 text-center">Qty</th>
-												<th className="border p-2 text-center">Days</th>
-												<th className="border p-2 text-right">Price/Day</th>
-												<th className="border p-2 text-right">Discount</th>
-												<th className="border p-2 text-right">GST</th>
-												<th className="border p-2 text-right">Total</th>
-											</tr>
-										</thead>
-										<tbody>
-											{quoteData.items.map((item, idx) => (
-												<tr key={idx} className="border">
-													<td className="border p-2">
-														<p className="font-semibold">{item.itemName}</p>
-														<p className="text-sm text-gray-700">{item.description}</p>
-													</td>
-													<td className="border p-2 text-center">{item.quantity}</td>
-													<td className="border p-2 text-center">{item.days}</td>
-													<td className="border p-2 text-right">₹{item.pricePerDay.toFixed(2)}</td>
-													<td className="border p-2 text-right">
-														₹{item.discountType === 'percent'
-															? ((item.quantity * item.days * item.pricePerDay * item.discount) / 100).toFixed(2)
-															: item.discount.toFixed(2)}
-													</td>
-													<td className="border p-2 text-right">
-														₹{(
-															((item.quantity * item.days * item.pricePerDay -
-																(item.discountType === 'percent'
-																	? (item.quantity * item.days * item.pricePerDay * item.discount) / 100
-																	: item.discount)) *
-																item.gstPercent) /
-															100
-														).toFixed(2)}
-													</td>
-													<td className="border p-2 text-right font-semibold">₹{item.total.toFixed(2)}</td>
-												</tr>
-											))}
-										</tbody>
-									</table>
-								</div>
-
-								{/* Totals */}
-								<div className="flex justify-end">
-									<div className="w-64">
-										<div className="flex justify-between py-2 border-t-2">
-											<span>Subtotal:</span>
-											<span>₹{quoteData.subtotal.toFixed(2)}</span>
-										</div>
-										<div className="flex justify-between py-2">
-											<span>Total Discount:</span>
-											<span>-₹{quoteData.totalDiscount.toFixed(2)}</span>
-										</div>
-										<div className="flex justify-between py-2">
-											<span>Total GST:</span>
-											<span>₹{quoteData.totalGST.toFixed(2)}</span>
-										</div>
-										<div className="flex justify-between py-2 text-lg font-bold border-t-2 border-b-2">
-											<span>Grand Total:</span>
-											<span>₹{quoteData.grandTotal.toFixed(2)}</span>
-										</div>
-									</div>
-								</div>
-
-								{/* Notes */}
-								{quoteData.notes && (
-									<div className="border-t-2 pt-4">
-										<p className="font-bold">Notes:</p>
-										<p className="text-gray-700 whitespace-pre-wrap">{quoteData.notes}</p>
-									</div>
-								)}
-
-								{/* Footer */}
-								<div className="border-t-2 pt-4 text-center text-sm text-gray-600">
-									<p>Thank you for your interest!</p>
-								</div>
-							</div>
-						</div>
-					</DialogContent>
-				</Dialog>
+				</DialogContent>
+			</Dialog>
 
 			{/* New Customer Dialog */}
 			<Dialog open={showNewCustomer} onOpenChange={setShowNewCustomer}>
@@ -891,6 +788,72 @@ const CreateQuote = () => {
 							</Button>
 						</div>
 					</div>
+				</DialogContent>
+			</Dialog>
+
+			{/* Item Catalog Selector Dialog */}
+			<Dialog open={showItemSelector} onOpenChange={setShowItemSelector}>
+				<DialogContent className="bg-[#111827] border-[#1F2937] max-w-2xl max-h-[80vh] overflow-hidden flex flex-col p-0">
+					<DialogHeader className="p-6 pb-0">
+						<DialogTitle className="text-white">Select Item from Catalog</DialogTitle>
+					</DialogHeader>
+					
+					<div className="p-6 flex-1 overflow-y-auto space-y-4">
+						<div className="relative mb-4">
+							<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+							<Input
+								placeholder="Search catalog items..."
+								value={itemSearchTerm}
+								onChange={(e) => setItemSearchTerm(e.target.value)}
+								className="pl-10 bg-[#0B0F19] border-[#1F2937] text-gray-300"
+							/>
+						</div>
+						
+						{masterItems.length === 0 ? (
+							<div className="text-center py-8">
+								<Package className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+								<p className="text-gray-400 mb-4">Your item catalog is empty.</p>
+								<Button 
+									onClick={() => navigate('/items')}
+									className="bg-blue-600 hover:bg-blue-700"
+								>
+									Manage Catalog
+								</Button>
+							</div>
+						) : (
+							<div className="grid grid-cols-1 gap-3">
+								{masterItems
+									.filter(m => 
+										m.name.toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
+										m.category?.toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
+										m.description.toLowerCase().includes(itemSearchTerm.toLowerCase())
+									)
+									.map(mItem => (
+									<button
+										key={mItem.id}
+										onClick={() => handleSelectItemFromCatalog(mItem)}
+										className="flex flex-col p-4 bg-[#0B0F19] border border-[#1F2937] rounded-lg hover:border-blue-500 hover:bg-blue-500/5 transition-all text-left group"
+									>
+										<div className="flex justify-between items-start w-full">
+											<span className="text-white font-semibold group-hover:text-blue-400">{mItem.name}</span>
+											<span className="text-blue-400 font-bold">₹{mItem.pricePerDay.toFixed(2)}/day</span>
+										</div>
+										<p className="text-gray-400 text-sm mt-1 line-clamp-1">{mItem.description}</p>
+										<div className="flex gap-2 mt-2">
+											<Badge variant="outline" className="text-[10px] py-0">{mItem.category || 'General'}</Badge>
+											<Badge variant="outline" className="text-[10px] py-0">{mItem.gstPercent}% GST</Badge>
+										</div>
+									</button>
+								))}
+							</div>
+						)}
+					</div>
+					
+					<DialogFooter className="p-6 pt-0">
+						<Button variant="outline" onClick={() => setShowItemSelector(false)} className="border-[#1F2937] text-gray-300">
+							Cancel
+						</Button>
+					</DialogFooter>
 				</DialogContent>
 			</Dialog>
 			</div>

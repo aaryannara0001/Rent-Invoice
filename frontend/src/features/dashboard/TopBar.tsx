@@ -6,7 +6,7 @@ export function TopBar() {
   return (
     <header className="flex h-16 items-center justify-between border-b border-border px-4 sm:px-6">
       <div className="flex items-center gap-2 sm:gap-4">
-        <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+        <SidebarTrigger className="hidden md:flex text-muted-foreground hover:text-foreground" />
         <div className="relative hidden sm:block">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
