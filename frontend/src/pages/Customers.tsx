@@ -105,11 +105,11 @@ const Customers = () => {
 
 	return (
 		<MainLayout>
-			<div className="p-6 space-y-6">
+			<div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
 				{/* Header */}
-				<div className="flex items-center justify-between">
-					<h1 className="text-3xl font-bold text-white">Customers</h1>
-					<Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleOpenAddDialog}>
+				<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+					<h1 className="text-2xl sm:text-3xl font-bold text-white">Customers</h1>
+					<Button className="bg-blue-600 hover:bg-blue-700 text-white text-sm w-full sm:w-auto" onClick={handleOpenAddDialog}>
 						<Plus className="h-4 w-4 mr-2" />
 						Add Customer
 					</Button>
@@ -117,7 +117,7 @@ const Customers = () => {
 
 				{/* Search */}
 				<Card className="bg-[#111827] border-[#1F2937]">
-					<CardContent className="p-6">
+					<CardContent className="p-4 sm:p-6">
 						<div className="relative">
 							<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
 							<Input

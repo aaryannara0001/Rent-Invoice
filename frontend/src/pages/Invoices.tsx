@@ -122,16 +122,16 @@ const Invoices = () => {
 
 	return (
 		<MainLayout>
-			<div className="p-6 space-y-6">
+			<div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
 				{/* Header */}
-				<div className="flex items-center justify-between">
-					<h1 className="text-3xl font-bold text-white">Invoices</h1>
-					<div className="flex gap-3">
-						<Button variant="outline" className="bg-[#1F2937] border-[#1F2937] text-gray-300 hover:bg-[#374151]">
+				<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+					<h1 className="text-2xl sm:text-3xl font-bold text-white">Invoices</h1>
+					<div className="flex flex-wrap gap-2 sm:gap-3">
+						<Button variant="outline" className="bg-[#1F2937] border-[#1F2937] text-gray-300 hover:bg-[#374151] text-sm">
 							<Download className="h-4 w-4 mr-2" />
 							Export
 						</Button>
-						<Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => navigate('/invoices/create')}>
+						<Button className="bg-blue-600 hover:bg-blue-700 text-white text-sm" onClick={() => navigate('/invoices/create')}>
 							<Plus className="h-4 w-4 mr-2" />
 							Create Invoice
 						</Button>
@@ -140,8 +140,8 @@ const Invoices = () => {
 
 				{/* Filters */}
 				<Card className="bg-[#111827] border-[#1F2937]">
-					<CardContent className="p-6">
-						<div className="flex flex-col md:flex-row gap-4">
+					<CardContent className="p-4 sm:p-6">
+						<div className="flex flex-col lg:flex-row gap-4">
 							<div className="flex-1">
 								<div className="relative">
 									<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -153,34 +153,36 @@ const Invoices = () => {
 									/>
 								</div>
 							</div>
-							<Select value={statusFilter} onValueChange={setStatusFilter}>
-								<SelectTrigger className="w-full md:w-48 bg-[#0B0F19] border-[#1F2937] text-gray-300">
-									<SelectValue placeholder="Filter by status" />
-								</SelectTrigger>
-								<SelectContent className="bg-[#111827] border-[#1F2937]">
-									<SelectItem value="all" className="text-gray-300">All Status</SelectItem>
-									<SelectItem value="draft" className="text-gray-300">Draft</SelectItem>
-									<SelectItem value="sent" className="text-gray-300">Sent</SelectItem>
-									<SelectItem value="pending" className="text-gray-300">Pending</SelectItem>
-									<SelectItem value="paid" className="text-gray-300">Paid</SelectItem>
-									<SelectItem value="overdue" className="text-gray-300">Overdue</SelectItem>
-								</SelectContent>
-							</Select>
-							<Select value={`${sortBy}-${sortOrder}`} onValueChange={(value) => {
-								const [by, order] = value.split('-');
-								setSortBy(by);
-								setSortOrder(order);
-							}}>
-								<SelectTrigger className="w-full md:w-48 bg-[#0B0F19] border-[#1F2937] text-gray-300">
-									<SelectValue placeholder="Sort by" />
-								</SelectTrigger>
-								<SelectContent className="bg-[#111827] border-[#1F2937]">
-									<SelectItem value="date-desc" className="text-gray-300">Date (Newest)</SelectItem>
-									<SelectItem value="date-asc" className="text-gray-300">Date (Oldest)</SelectItem>
-									<SelectItem value="amount-desc" className="text-gray-300">Amount (High)</SelectItem>
-									<SelectItem value="amount-asc" className="text-gray-300">Amount (Low)</SelectItem>
-								</SelectContent>
-							</Select>
+							<div className="flex flex-col sm:flex-row gap-4">
+								<Select value={statusFilter} onValueChange={setStatusFilter}>
+									<SelectTrigger className="w-full sm:w-48 bg-[#0B0F19] border-[#1F2937] text-gray-300">
+										<SelectValue placeholder="Filter by status" />
+									</SelectTrigger>
+									<SelectContent className="bg-[#111827] border-[#1F2937]">
+										<SelectItem value="all" className="text-gray-300">All Status</SelectItem>
+										<SelectItem value="draft" className="text-gray-300">Draft</SelectItem>
+										<SelectItem value="sent" className="text-gray-300">Sent</SelectItem>
+										<SelectItem value="pending" className="text-gray-300">Pending</SelectItem>
+										<SelectItem value="paid" className="text-gray-300">Paid</SelectItem>
+										<SelectItem value="overdue" className="text-gray-300">Overdue</SelectItem>
+									</SelectContent>
+								</Select>
+								<Select value={`${sortBy}-${sortOrder}`} onValueChange={(value) => {
+									const [by, order] = value.split('-');
+									setSortBy(by);
+									setSortOrder(order);
+								}}>
+									<SelectTrigger className="w-full sm:w-48 bg-[#0B0F19] border-[#1F2937] text-gray-300">
+										<SelectValue placeholder="Sort by" />
+									</SelectTrigger>
+									<SelectContent className="bg-[#111827] border-[#1F2937]">
+										<SelectItem value="date-desc" className="text-gray-300">Date (Newest)</SelectItem>
+										<SelectItem value="date-asc" className="text-gray-300">Date (Oldest)</SelectItem>
+										<SelectItem value="amount-desc" className="text-gray-300">Amount (High)</SelectItem>
+										<SelectItem value="amount-asc" className="text-gray-300">Amount (Low)</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
 						</div>
 					</CardContent>
 				</Card>

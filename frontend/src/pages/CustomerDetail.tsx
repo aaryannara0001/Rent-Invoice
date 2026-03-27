@@ -54,16 +54,16 @@ const CustomerDetail = () => {
 
 	return (
 		<MainLayout>
-			<div className="p-6 max-w-6xl mx-auto space-y-6">
+			<div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 sm:space-y-6">
 				{/* Header */}
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-4">
+				<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+					<div className="flex items-center gap-2 sm:gap-4">
 						<Button variant="ghost" onClick={() => navigate('/customers')} className="text-gray-400 hover:text-gray-300">
 							<ArrowLeft className="h-4 w-4" />
 						</Button>
-						<h1 className="text-3xl font-bold text-white">{customer.name}</h1>
+						<h1 className="text-2xl sm:text-3xl font-bold text-white">{customer.name}</h1>
 					</div>
-					<Button onClick={() => navigate('/customers')} className="bg-blue-600 hover:bg-blue-700 text-white">
+					<Button onClick={() => navigate('/customers')} className="bg-blue-600 hover:bg-blue-700 text-white text-sm w-full sm:w-auto">
 						Back to Customers
 					</Button>
 				</div>

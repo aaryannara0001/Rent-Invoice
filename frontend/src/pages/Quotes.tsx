@@ -108,14 +108,14 @@ const Quotes = () => {
 		<MainLayout>
 			<div className="p-6 space-y-6">
 				{/* Header */}
-				<div className="flex items-center justify-between">
-					<h1 className="text-3xl font-bold text-white">Quotes</h1>
-					<div className="flex gap-3">
-						<Button variant="outline" className="bg-[#1F2937] border-[#1F2937] text-gray-300 hover:bg-[#374151]">
+				<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+					<h1 className="text-2xl sm:text-3xl font-bold text-white">Quotes</h1>
+					<div className="flex flex-wrap gap-2 sm:gap-3">
+						<Button variant="outline" className="bg-[#1F2937] border-[#1F2937] text-gray-300 hover:bg-[#374151] text-sm">
 							<Download className="h-4 w-4 mr-2" />
 							Export
 						</Button>
-						<Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => navigate('/quotes/create')}>
+						<Button className="bg-blue-600 hover:bg-blue-700 text-white text-sm" onClick={() => navigate('/quotes/create')}>
 							<Plus className="h-4 w-4 mr-2" />
 							Create Quote
 						</Button>
@@ -124,8 +124,8 @@ const Quotes = () => {
 
 				{/* Filters */}
 				<Card className="bg-[#111827] border-[#1F2937]">
-					<CardContent className="p-6">
-						<div className="flex flex-col md:flex-row gap-4">
+					<CardContent className="p-4 sm:p-6">
+						<div className="flex flex-col lg:flex-row gap-4">
 							<div className="flex-1">
 								<div className="relative">
 									<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -138,7 +138,7 @@ const Quotes = () => {
 								</div>
 							</div>
 							<Select value={statusFilter} onValueChange={setStatusFilter}>
-								<SelectTrigger className="w-full md:w-48 bg-[#0B0F19] border-[#1F2937] text-gray-300">
+								<SelectTrigger className="w-full sm:w-48 bg-[#0B0F19] border-[#1F2937] text-gray-300">
 									<SelectValue placeholder="Filter by status" />
 								</SelectTrigger>
 								<SelectContent className="bg-[#111827] border-[#1F2937]">

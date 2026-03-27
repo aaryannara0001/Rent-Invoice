@@ -77,7 +77,7 @@ export function RecentInvoicesTable() {
               placeholder="Search..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-9 w-48 bg-secondary border-border pl-9 text-sm"
+              className="h-9 w-32 sm:w-48 bg-secondary border-border pl-9 text-sm"
             />
           </div>
           <div className="flex gap-1 rounded-lg bg-secondary p-1">

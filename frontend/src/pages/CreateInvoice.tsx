@@ -313,21 +313,21 @@ const CreateInvoice = () => {
 
 	return (
 		<MainLayout>
-			<div className="p-6 max-w-6xl mx-auto space-y-6">
+			<div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 sm:space-y-6">
 				{/* Header */}
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-4">
+				<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+					<div className="flex items-center gap-2 sm:gap-4">
 						<Button variant="ghost" onClick={() => navigate('/invoices')} className="text-gray-400 hover:text-gray-300">
 							<ArrowLeft className="h-4 w-4" />
 						</Button>
-						<h1 className="text-3xl font-bold text-white">{id ? 'Edit Invoice' : 'Create Invoice'}</h1>
+						<h1 className="text-2xl sm:text-3xl font-bold text-white">{id ? 'Edit Invoice' : 'Create Invoice'}</h1>
 					</div>
-					<div className="flex gap-3">
+					<div className="flex flex-wrap gap-2 sm:gap-3">
 						{id && (
 							<>
 								<Button
 									variant="outline"
-									className="bg-[#1F2937] border-[#1F2937] text-gray-300 hover:bg-[#374151]"
+									className="bg-[#1F2937] border-[#1F2937] text-gray-300 hover:bg-[#374151] text-sm"
 									onClick={() => setShowPreview(true)}
 								>
 									<Eye className="h-4 w-4 mr-2" />
@@ -335,7 +335,7 @@ const CreateInvoice = () => {
 								</Button>
 								<Button
 									variant="outline"
-									className="bg-green-600 border-green-600 text-white hover:bg-green-700"
+									className="bg-green-600 border-green-600 text-white hover:bg-green-700 text-sm"
 									onClick={() => {
 										if (validateForm()) {
 											generateInvoicePDF(id, invoiceData.customerName || 'Invoice');
@@ -347,7 +347,7 @@ const CreateInvoice = () => {
 								</Button>
 							</>
 						)}
-						<Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white">
+						<Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white text-sm">
 							<Save className="h-4 w-4 mr-2" />
 							Save Invoice
 						</Button>

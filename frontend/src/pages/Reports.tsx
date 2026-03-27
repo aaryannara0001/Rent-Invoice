@@ -109,15 +109,15 @@ const Reports = () => {
 		<MainLayout>
 			<div className="min-h-screen bg-[#0B0F19] text-gray-300">
 				{/* Header */}
-				<div className="sticky top-0 z-10 bg-[#0B0F19] border-b border-[#1F2937] p-6">
-					<div className="flex items-center justify-between">
+				<div className="sticky top-0 z-10 bg-[#0B0F19] border-b border-[#1F2937] p-4 sm:p-6">
+					<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 						<div>
-							<h1 className="text-2xl font-bold text-white">Reports & Analytics</h1>
-							<p className="text-gray-400 mt-1">Track your business performance and insights</p>
+							<h1 className="text-xl sm:text-2xl font-bold text-white">Reports & Analytics</h1>
+							<p className="text-gray-400 mt-1 text-sm sm:text-base">Track your business performance and insights</p>
 						</div>
-						<div className="flex gap-3">
+						<div className="flex flex-wrap gap-2 sm:gap-3">
 							<Select value={timeRange} onValueChange={setTimeRange}>
-								<SelectTrigger className="w-32 bg-[#111827] border-[#1F2937] text-gray-300">
+								<SelectTrigger className="w-full sm:w-32 bg-[#111827] border-[#1F2937] text-gray-300">
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent className="bg-[#111827] border-[#1F2937]">
@@ -127,7 +127,7 @@ const Reports = () => {
 									<SelectItem value="1y" className="text-gray-300">Last year</SelectItem>
 								</SelectContent>
 							</Select>
-							<Button variant="outline" className="bg-[#1F2937] border-[#1F2937] text-gray-300 hover:bg-[#374151]">
+							<Button variant="outline" className="bg-[#1F2937] border-[#1F2937] text-gray-300 hover:bg-[#374151] text-sm">
 								<Download className="h-4 w-4 mr-2" />
 								Export
 							</Button>
@@ -135,7 +135,7 @@ const Reports = () => {
 					</div>
 				</div>
 
-				<div className="p-6 space-y-6">
+				<div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
 					{/* Overview Cards */}
 					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 						<Card className="bg-[#111827] border-[#1F2937]">
