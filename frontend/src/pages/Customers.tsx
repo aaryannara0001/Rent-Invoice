@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Plus, Search, Trash2, Eye, Edit } from 'lucide-react';
+import { Plus, Search, Trash2, Pencil, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import MainLayout from '@/layouts/MainLayout';
@@ -15,7 +15,9 @@ import { Customer } from '@/context/types';
 
 const Customers = () => {
 	const navigate = useNavigate();
-	const { customers, addCustomer, updateCustomer, deleteCustomer, getCustomerInvoices, getCustomerRevenue } = useApp();
+	const { customers, addCustomer, updateCustomer, deleteCustomer, getCustomerInvoices, getCustomerRevenue, role } = useApp();
+	const isEditor = role === 'editor';
+	
 	const [searchTerm, setSearchTerm] = useState('');
 	const [addCustomerDialogOpen, setAddCustomerDialogOpen] = useState(false);
 	const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -37,6 +39,7 @@ const Customers = () => {
 	);
 
 	const handleOpenAddDialog = () => {
+		if (!isEditor) return;
 		setEditingCustomer(null);
 		setFormData({
 			name: '',
@@ -49,6 +52,7 @@ const Customers = () => {
 	};
 
 	const handleOpenEditDialog = (customer: Customer) => {
+		if (!isEditor) return;
 		setEditingCustomer(customer);
 		setFormData({
 			name: customer.name,
@@ -61,6 +65,7 @@ const Customers = () => {
 	};
 
 	const handleSaveCustomer = () => {
+		if (!isEditor) return;
 		if (!formData.name || !formData.phone || !formData.email) {
 			toast.error('Please fill in all required fields');
 			return;
@@ -85,16 +90,10 @@ const Customers = () => {
 		}
 
 		setAddCustomerDialogOpen(false);
-		setFormData({
-			name: '',
-			phone: '',
-			email: '',
-			address: '',
-			gstin: '',
-		});
 	};
 
 	const handleDeleteCustomer = () => {
+		if (!isEditor) return;
 		if (customerToDelete) {
 			deleteCustomer(customerToDelete);
 			setDeleteDialogOpen(false);
@@ -108,11 +107,16 @@ const Customers = () => {
 			<div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
 				{/* Header */}
 				<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-					<h1 className="text-2xl sm:text-3xl font-bold text-white">Customers</h1>
-					<Button className="bg-blue-600 hover:bg-blue-700 text-white text-sm w-full sm:w-auto" onClick={handleOpenAddDialog}>
-						<Plus className="h-4 w-4 mr-2" />
-						Add Customer
-					</Button>
+					<div className="flex items-center gap-2 sm:gap-3">
+						<Users className="h-6 sm:h-8 w-6 sm:w-8 text-blue-500" />
+						<h1 className="text-2xl sm:text-3xl font-bold text-white">Customers</h1>
+					</div>
+					{isEditor && (
+						<Button className="bg-blue-600 hover:bg-blue-700 text-white text-sm w-full sm:w-auto" onClick={handleOpenAddDialog}>
+							<Plus className="h-4 w-4 mr-2" />
+							Add Customer
+						</Button>
+					)}
 				</div>
 
 				{/* Search */}
@@ -135,11 +139,13 @@ const Customers = () => {
 					<CardContent className="p-0">
 						{filteredCustomers.length === 0 ? (
 							<div className="text-center py-12">
-								<p className="text-gray-500">No customers found. Add one to get started!</p>
-								<Button className="mt-4 bg-blue-600 hover:bg-blue-700 text-white" onClick={handleOpenAddDialog}>
-									<Plus className="h-4 w-4 mr-2" />
-									Add First Customer
-								</Button>
+								<p className="text-gray-500">No customers found. {isEditor ? 'Add one to get started!' : ''}</p>
+								{isEditor && (
+									<Button className="mt-4 bg-blue-600 hover:bg-blue-700 text-white" onClick={handleOpenAddDialog}>
+										<Plus className="h-4 w-4 mr-2" />
+										Add First Customer
+									</Button>
+								)}
 							</div>
 						) : (
 							<div className="overflow-x-auto">
@@ -165,7 +171,7 @@ const Customers = () => {
 													<TableCell className="text-gray-300 font-medium">{customer.name}</TableCell>
 													<TableCell className="text-gray-300">{customer.phone}</TableCell>
 													<TableCell className="text-gray-300">{customer.email}</TableCell>
-													<TableCell className="text-gray-300 text-sm">{customer.address.substring(0, 30)}...</TableCell>
+													<TableCell className="text-gray-300 text-sm max-w-[200px] truncate">{customer.address}</TableCell>
 													<TableCell className="text-gray-300">
 														<Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
 															{invoices.length}
@@ -179,28 +185,35 @@ const Customers = () => {
 																size="sm"
 																className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
 																onClick={() => navigate(`/customers/${customer.id}`)}
+																title="View"
 															>
-																<Eye className="h-4 w-4" />
+																<Search className="h-4 w-4" />
 															</Button>
-															<Button
-																variant="ghost"
-																size="sm"
-																className="text-gray-400 hover:text-gray-300 hover:bg-gray-500/10"
-																onClick={() => handleOpenEditDialog(customer)}
-															>
-																<Edit className="h-4 w-4" />
-															</Button>
-															<Button
-																variant="ghost"
-																size="sm"
-																className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-																onClick={() => {
-																	setCustomerToDelete(customer.id);
-																	setDeleteDialogOpen(true);
-																}}
-															>
-																<Trash2 className="h-4 w-4" />
-															</Button>
+															{isEditor && (
+																<>
+																	<Button
+																		variant="ghost"
+																		size="sm"
+																		className="text-gray-400 hover:text-gray-300 hover:bg-gray-500/10"
+																		onClick={() => handleOpenEditDialog(customer)}
+																		title="Edit"
+																	>
+																		<Pencil className="h-4 w-4" />
+																	</Button>
+																	<Button
+																		variant="ghost"
+																		size="sm"
+																		className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+																		onClick={() => {
+																			setCustomerToDelete(customer.id);
+																			setDeleteDialogOpen(true);
+																		}}
+																		title="Delete"
+																	>
+																		<Trash2 className="h-4 w-4" />
+																	</Button>
+																</>
+															)}
 														</div>
 													</TableCell>
 												</TableRow>

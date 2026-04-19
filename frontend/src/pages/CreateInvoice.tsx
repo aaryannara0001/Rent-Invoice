@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Minus, Save, Trash2, Download, Eye, X, Package, Search, Check, ChevronsUpDown } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,65 +11,74 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/utils/utils';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import MainLayout from '@/layouts/MainLayout';
 import { useApp } from '@/context/useApp';
 import { toast } from 'sonner';
-import { Invoice, RentalItem } from '@/context/types';
+import { Invoice, RentalItem, MasterItem, Customer } from '@/context/types';
 import { generateInvoicePDF } from '@/lib/pdfGenerator';
 import InvoicePreview from '@/components/InvoicePreview';
+import { PaymentSelector } from '@/features/dashboard/components/PaymentSelector';
+import { invoiceSchema, customerSchema, InvoiceFormData, CustomerFormData } from '@/schemas';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const CreateInvoice = () => {
 	const navigate = useNavigate();
 	const { id } = useParams();
-	const { invoices, customers, addInvoice, updateInvoice, getInvoice, addCustomer, masterItems } = useApp();
+	const [searchParams] = useSearchParams();
+	const isViewMode = searchParams.get('view') === 'true';
+	const { invoices, customers, addCustomer, masterItems, addInvoice, updateInvoice, getInvoice, getCustomer, paymentMethods } = useApp();
+
 	const [showPreview, setShowPreview] = useState(false);
 	const [showNewCustomer, setShowNewCustomer] = useState(false);
-	const [newCustomer, setNewCustomer] = useState({
-		name: '',
-		phone: '',
-		email: '',
-		address: '',
-		gstin: '',
-	});
-
-	const [invoiceData, setInvoiceData] = useState<Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>>({
-		customerId: '',
-		customerName: '',
-		customerPhone: '',
-		customerEmail: '',
-		customerAddress: '',
-		customerGstin: '',
-		invoiceNumber: `INV-${Date.now()}`,
-		invoiceDate: new Date().toISOString().split('T')[0],
-		dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-		items: [
-			{
-				id: '1',
-				itemName: '',
-				description: '',
-				quantity: 1,
-				days: 1,
-				pricePerDay: 0,
-				discount: 0,
-				discountType: 'amount',
-				gstPercent: 18,
-				total: 0,
-			},
-		],
-		subtotal: 0,
-		totalDiscount: 0,
-		totalGST: 0,
-		grandTotal: 0,
-		status: 'draft',
-		notes: '',
-	});
- 
 	const [showItemSelector, setShowItemSelector] = useState(false);
 	const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null);
 	const [itemSearchTerm, setItemSearchTerm] = useState('');
+
+	const form = useForm<InvoiceFormData>({
+		resolver: zodResolver(invoiceSchema),
+		mode: 'onChange',
+		defaultValues: {
+			customerId: '',
+			customerName: '',
+			customerPhone: '',
+			customerEmail: '',
+			customerAddress: '',
+			customerGstin: '',
+			invoiceNumber: `INV-${Date.now()}`,
+			invoiceDate: new Date().toISOString().split('T')[0],
+			dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+			items: [
+				{
+					id: '1',
+					itemName: '',
+					description: '',
+					quantity: 1,
+					days: 1,
+					pricePerDay: 0,
+					discount: 0,
+					discountType: 'amount',
+					gstPercent: 18,
+					total: 0,
+				},
+			],
+			subtotal: 0,
+			totalDiscount: 0,
+			totalGST: 0,
+			grandTotal: 0,
+			status: 'draft',
+			notes: '',
+			paymentMethodId: '',
+		},
+	});
+
+	const { fields, append, remove } = useFieldArray({
+		control: form.control,
+		name: 'items',
+	});
+
+	const watchedItems = form.watch('items');
+	const watchedCustomerId = form.watch('customerId');
 
 	// Load invoice if editing
 	useEffect(() => {
@@ -75,74 +86,120 @@ const CreateInvoice = () => {
 			const existingInvoice = getInvoice(id);
 			if (existingInvoice) {
 				const { id: _, createdAt, updatedAt, ...rest } = existingInvoice;
-				setInvoiceData(rest);
+				form.reset(rest as any);
 			}
 		}
-	}, [id, getInvoice]);
+	}, [id, getInvoice, form]);
+
+	// Set default payment method for new invoices
+	useEffect(() => {
+		if (!id && paymentMethods.length > 0 && !form.getValues('paymentMethodId')) {
+			const defaultMethod = paymentMethods.find(m => m.isDefault) || paymentMethods[0];
+			if (defaultMethod) {
+				form.setValue('paymentMethodId', defaultMethod.id);
+			}
+		}
+	}, [id, paymentMethods, form]);
+
+	// Update customer details when customer is selected
+	useEffect(() => {
+		if (watchedCustomerId) {
+			const customer = customers.find(c => c.id === watchedCustomerId);
+			if (customer) {
+				form.setValue('customerName', customer.name);
+				form.setValue('customerPhone', customer.phone);
+				form.setValue('customerEmail', customer.email);
+				form.setValue('customerAddress', customer.address);
+				form.setValue('customerGstin', customer.gstin || '');
+			}
+		}
+	}, [watchedCustomerId, customers, form]);
 
 	// Calculate totals
 	useEffect(() => {
-		const subtotal = invoiceData.items.reduce((sum, item) => {
-			const itemSubtotal = item.quantity * item.days * item.pricePerDay;
-			return sum + itemSubtotal;
-		}, 0);
-
+		let subtotal = 0;
 		let totalDiscount = 0;
-		invoiceData.items.forEach(item => {
-			const itemSubtotal = item.quantity * item.days * item.pricePerDay;
-			if (item.discountType === 'amount') {
-				totalDiscount += item.discount;
-			} else {
-				totalDiscount += (itemSubtotal * item.discount) / 100;
+		let totalGST = 0;
+
+		(watchedItems || []).forEach((item) => {
+			const qty = Number(item.quantity) || 0;
+			const days = Number(item.days) || 0;
+			const price = Number(item.pricePerDay) || 0;
+			const itemSubtotal = qty * days * price;
+			let discount = Number(item.discount) || 0;
+			if (item.discountType === 'percent') {
+				discount = (itemSubtotal * discount) / 100;
 			}
+			const afterDiscount = itemSubtotal - discount;
+			const gst = (afterDiscount * (Number(item.gstPercent) || 0)) / 100;
+			subtotal += itemSubtotal;
+			totalDiscount += discount;
+			totalGST += gst;
 		});
 
-		const subtotalAfterDiscount = subtotal - totalDiscount;
-		const totalGST = invoiceData.items.reduce((sum, item) => {
-			const itemSubtotal = item.quantity * item.days * item.pricePerDay;
-			const itemAfterDiscount = item.discountType === 'amount'
-				? itemSubtotal - item.discount
-				: itemSubtotal - (itemSubtotal * item.discount) / 100;
-			return sum + (itemAfterDiscount * item.gstPercent) / 100;
-		}, 0);
+		const grandTotal = subtotal - totalDiscount + totalGST;
 
-		const grandTotal = subtotalAfterDiscount + totalGST;
+		form.setValue('subtotal', subtotal, { shouldValidate: false });
+		form.setValue('totalDiscount', totalDiscount, { shouldValidate: false });
+		form.setValue('totalGST', totalGST, { shouldValidate: false });
+		form.setValue('grandTotal', grandTotal, { shouldValidate: false });
+	}, [watchedItems, form]);
 
-		setInvoiceData(prev => ({
-			...prev,
-			subtotal: Math.max(0, subtotalAfterDiscount),
-			totalDiscount: Math.max(0, totalDiscount),
-			totalGST: Math.max(0, totalGST),
-			grandTotal: Math.max(0, grandTotal),
-		}));
-	}, [invoiceData.items]);
+	const customerForm = useForm<CustomerFormData>({
+		resolver: zodResolver(customerSchema),
+		defaultValues: {
+			name: '',
+			phone: '',
+			email: '',
+			address: '',
+			gstin: '',
+		},
+	});
 
-	const updateItem = (itemId: string, field: keyof RentalItem, value: string | number | boolean) => {
-		setInvoiceData(prev => ({
-			...prev,
-			items: prev.items.map(item => {
-				if (item.id === itemId) {
-					const updated = { ...item, [field]: value };
+	const handleAddCustomer = (data: CustomerFormData) => {
+		const customerId = `CUST-${Date.now()}`;
+		const now = new Date().toISOString();
+		const customerData: Customer = {
+			id: customerId,
+			name: data.name,
+			phone: data.phone,
+			email: data.email,
+			address: data.address,
+			gstin: data.gstin || '',
+			createdAt: now,
+			updatedAt: now,
+		};
 
-					// Calculate item total
-					const itemSubtotal = updated.quantity * updated.days * updated.pricePerDay;
-					let discount = updated.discount;
-					if (updated.discountType === 'percent') {
-						discount = (itemSubtotal * updated.discount) / 100;
-					}
-					const afterDiscount = itemSubtotal - discount;
-					const gst = (afterDiscount * updated.gstPercent) / 100;
-					updated.total = afterDiscount + gst;
+		addCustomer(customerData);
 
-					return updated;
-				}
-				return item;
-			}),
-		}));
+		form.setValue('customerId', customerId);
+		form.setValue('customerName', data.name);
+		form.setValue('customerPhone', data.phone);
+		form.setValue('customerEmail', data.email);
+		form.setValue('customerAddress', data.address);
+		form.setValue('customerGstin', data.gstin || '');
+
+		customerForm.reset();
+		setShowNewCustomer(false);
+		toast.success('Customer added successfully');
+	};
+
+	const handleSelectItemFromCatalog = (masterItem: MasterItem, indexOverride?: number) => {
+		const targetIndex = indexOverride !== undefined ? indexOverride : activeItemIndex;
+		if (targetIndex !== null) {
+			form.setValue(`items.${targetIndex}.itemName`, masterItem.name, { shouldValidate: false });
+			form.setValue(`items.${targetIndex}.description`, masterItem.description || '', { shouldValidate: false });
+			form.setValue(`items.${targetIndex}.pricePerDay`, masterItem.pricePerDay, { shouldValidate: false });
+			form.setValue(`items.${targetIndex}.gstPercent`, masterItem.gstPercent, { shouldValidate: false });
+			
+			setShowItemSelector(false);
+			setActiveItemIndex(null);
+			toast.success(`Selected ${masterItem.name}`);
+		}
 	};
 
 	const addItem = () => {
-		const newItem: RentalItem = {
+		append({
 			id: Date.now().toString(),
 			itemName: '',
 			description: '',
@@ -153,163 +210,56 @@ const CreateInvoice = () => {
 			discountType: 'amount',
 			gstPercent: 18,
 			total: 0,
-		};
-		setInvoiceData(prev => ({
-			...prev,
-			items: [...prev.items, newItem],
-		}));
+		});
 	};
 
-	const removeItem = (itemId: string) => {
-		if (invoiceData.items.length > 1) {
-			setInvoiceData(prev => ({
-				...prev,
-				items: prev.items.filter(item => item.id !== itemId),
-			}));
-		} else {
-			toast.error('Invoice must have at least one item');
+	const removeItem = (index: number) => {
+		if (fields.length > 1) {
+			remove(index);
 		}
 	};
 
-	const updateCustomerField = (field: string, value: string) => {
-		setInvoiceData(prev => ({
-			...prev,
-			[`customer${field.charAt(0).toUpperCase() + field.slice(1)}`]: value,
-		}));
-	};
-
-	const handleAddNewCustomer = () => {
-		if (!newCustomer.name.trim()) {
-			toast.error('Please enter customer name');
-			return;
-		}
-		
-		const customerId = `CUST-${Date.now()}`;
+	const onSubmit = (data: InvoiceFormData) => {
 		const now = new Date().toISOString();
-		const customerData = {
-			id: customerId,
-			...newCustomer,
-			createdAt: now,
+		const invoiceData: Invoice = {
+			id: id || data.invoiceNumber,
+			customerId: data.customerId,
+			customerName: data.customerName,
+			customerPhone: data.customerPhone,
+			customerEmail: data.customerEmail,
+			customerAddress: data.customerAddress,
+			customerGstin: data.customerGstin || '',
+			invoiceNumber: data.invoiceNumber,
+			invoiceDate: data.invoiceDate,
+			dueDate: data.dueDate,
+			items: data.items as RentalItem[],
+			subtotal: data.subtotal,
+			totalDiscount: data.totalDiscount,
+			totalGST: data.totalGST,
+			grandTotal: data.grandTotal,
+			status: data.status as any,
+			eventName: data.eventName || '',
+			eventLocation: data.eventLocation || '',
+			notes: data.notes || '',
+			paymentMethodId: data.paymentMethodId || '',
+			createdAt: id ? (getInvoice(id)?.createdAt || now) : now,
 			updatedAt: now,
 		};
-		
-		addCustomer(customerData);
-		
-		setInvoiceData(prev => ({
-			...prev,
-			customerId: customerId,
-			customerName: newCustomer.name,
-			customerPhone: newCustomer.phone,
-			customerEmail: newCustomer.email,
-			customerAddress: newCustomer.address,
-			customerGstin: newCustomer.gstin,
-		}));
-		
-		setNewCustomer({
-			name: '',
-			phone: '',
-			email: '',
-			address: '',
-			gstin: '',
-		});
-		setShowNewCustomer(false);
-		toast.success('Customer added successfully');
-	};
- 
-	const handleSelectItemFromCatalog = (masterItem: any, indexOverride?: number) => {
-		const targetIndex = indexOverride !== undefined ? indexOverride : activeItemIndex;
-		if (targetIndex !== null) {
-			setInvoiceData(prev => ({
-				...prev,
-				items: prev.items.map((item, index) => {
-					if (index === targetIndex) {
-						const updated = {
-							...item,
-							itemName: masterItem.name,
-							description: masterItem.description,
-							pricePerDay: masterItem.pricePerDay,
-							gstPercent: masterItem.gstPercent,
-						};
-						
-						// Recalculate item total
-						const itemSubtotal = updated.quantity * updated.days * updated.pricePerDay;
-						let discount = updated.discount;
-						if (updated.discountType === 'percent') {
-							discount = (itemSubtotal * updated.discount) / 100;
-						}
-						const afterDiscount = itemSubtotal - discount;
-						const gst = (afterDiscount * updated.gstPercent) / 100;
-						updated.total = afterDiscount + gst;
-						
-						return updated;
-					}
-					return item;
-				}),
-			}));
-			setShowItemSelector(false);
-			setActiveItemIndex(null);
-			toast.success(`Selected ${masterItem.name}`);
-		}
-	};
 
-	const validateForm = () => {
-		if (!invoiceData.customerId) {
-			toast.error('Please select a customer');
-			return false;
-		}
-		
-		if (!invoiceData.invoiceNumber.trim()) {
-			toast.error('Invoice number is required');
-			return false;
-		}
-
-		if (invoiceData.items.length === 0) {
-			toast.error('Add at least one item');
-			return false;
-		}
-
-		for (let i = 0; i < invoiceData.items.length; i++) {
-			const item = invoiceData.items[i];
-			if (!item.itemName.trim()) {
-				toast.error(`Item ${i + 1} name is required`);
-				return false;
-			}
-			if (item.quantity <= 0) {
-				toast.error(`Item ${i + 1} quantity must be greater than 0`);
-				return false;
-			}
-			if (item.pricePerDay < 0) {
-				toast.error(`Item ${i + 1} price cannot be negative`);
-				return false;
-			}
-		}
-
-		return true;
-	};
-
-	const handleSave = () => {
-		if (!validateForm()) return;
-
-		const now = new Date().toISOString();
 		if (id) {
-			updateInvoice(id, {
-				...invoiceData,
-				id,
-				createdAt: getInvoice(id)?.createdAt || now,
-				updatedAt: now,
-			});
+			updateInvoice(id, invoiceData);
 			toast.success('Invoice updated successfully');
 		} else {
-			addInvoice({
-				...invoiceData,
-				id: invoiceData.invoiceNumber,
-				createdAt: now,
-				updatedAt: now,
-			});
+			addInvoice(invoiceData);
 			toast.success('Invoice created successfully');
 		}
 		navigate('/invoices');
 	};
+
+	const filteredMasterItems = masterItems.filter(item =>
+		item.name.toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
+		item.description?.toLowerCase().includes(itemSearchTerm.toLowerCase())
+	);
 
 	return (
 		<MainLayout>
@@ -320,580 +270,573 @@ const CreateInvoice = () => {
 						<Button variant="ghost" onClick={() => navigate('/invoices')} className="text-gray-400 hover:text-gray-300">
 							<ArrowLeft className="h-4 w-4" />
 						</Button>
-						<h1 className="text-2xl sm:text-3xl font-bold text-white">{id ? 'Edit Invoice' : 'Create Invoice'}</h1>
+						<h1 className="text-2xl sm:text-3xl font-bold text-white">{id ? (isViewMode ? 'Invoice Details' : 'Edit Invoice') : 'Create Invoice'}</h1>
 					</div>
 					<div className="flex flex-wrap gap-2 sm:gap-3">
-						{id && (
-							<>
-								<Button
-									variant="outline"
-									className="bg-[#1F2937] border-[#1F2937] text-gray-300 hover:bg-[#374151] text-sm"
-									onClick={() => setShowPreview(true)}
-								>
-									<Eye className="h-4 w-4 mr-2" />
-									Preview
-								</Button>
-								<Button
-									variant="outline"
-									className="bg-green-600 border-green-600 text-white hover:bg-green-700 text-sm"
-									onClick={() => {
-										if (validateForm()) {
-											generateInvoicePDF(id, invoiceData.customerName || 'Invoice');
-										}
-									}}
-								>
-									<Download className="h-4 w-4 mr-2" />
-									Download PDF
-								</Button>
-							</>
-						)}
-						<Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white text-sm">
-							<Save className="h-4 w-4 mr-2" />
-							Save Invoice
+						<Button
+							variant="outline"
+							className="bg-[#1F2937] border-[#1F2937] text-gray-300 hover:bg-[#374151] text-sm"
+							onClick={() => setShowPreview(true)}
+						>
+							<Eye className="h-4 w-4 mr-2" />
+							Preview
+						</Button>
+						<Button
+							variant="outline"
+							className="bg-green-600 border-green-600 text-white hover:bg-green-700 text-sm"
+							onClick={() => {
+								const data = form.getValues();
+								generateInvoicePDF(id || 'preview', data.customerName || 'Invoice');
+							}}
+						>
+							<Download className="h-4 w-4 mr-2" />
+							Download PDF
 						</Button>
 					</div>
 				</div>
 
-				{/* Form */}
-				<div className="space-y-6">
-					{/* Customer Selection */}
-					<Card className="bg-[#111827] border-[#1F2937]">
-						<CardHeader>
-							<CardTitle className="text-white">Select Customer</CardTitle>
-						</CardHeader>
-					<CardContent className="space-y-4">
-						<div>
-							<div className="flex items-center gap-2 mb-2">
-								<Label className="text-gray-300">Customer</Label>
-								<Button 
-									size="sm" 
-									className="bg-blue-600 hover:bg-blue-700 text-white ml-auto"
-									onClick={() => setShowNewCustomer(true)}
-								>
-									<Plus className="h-4 w-4 mr-1" />
-									New Customer
-								</Button>
-							</div>
-							<Select value={invoiceData.customerId} onValueChange={(customerId) => {
-								const customer = customers.find(c => c.id === customerId);
-								if (customer) {
-									setInvoiceData(prev => ({
-										...prev,
-										customerId: customer.id,
-										customerName: customer.name,
-										customerPhone: customer.phone,
-										customerEmail: customer.email,
-										customerAddress: customer.address,
-										customerGstin: customer.gstin,
-									}));
-								}
-							}}>
-								<SelectTrigger className="bg-[#0B0F19] border-[#1F2937] text-gray-300">
-									<SelectValue placeholder="Select a customer..." />
-								</SelectTrigger>
-								<SelectContent className="bg-[#111827] border-[#1F2937]">
-									{customers.map(customer => (
-										<SelectItem key={customer.id} value={customer.id} className="text-gray-300">
-											{customer.name}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>							{invoiceData.customerId && (
-								<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 p-4 bg-[#0B0F19] rounded-lg border border-[#1F2937]">
-									<div>
-										<Label className="text-gray-400 text-sm">Name</Label>
-										<p className="text-gray-300">{invoiceData.customerName}</p>
-									</div>
-									<div>
-										<Label className="text-gray-400 text-sm">Phone</Label>
-										<p className="text-gray-300">{invoiceData.customerPhone}</p>
-									</div>
-									<div>
-										<Label className="text-gray-400 text-sm">Email</Label>
-										<p className="text-gray-300">{invoiceData.customerEmail}</p>
-									</div>
-									<div>
-										<Label className="text-gray-400 text-sm">GSTIN</Label>
-										<p className="text-gray-300">{invoiceData.customerGstin}</p>
-									</div>
+				<Form {...form}>
+					<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+						{/* Customer Details */}
+						<Card className="bg-glass border-white/5 backdrop-blur-2xl glow-border">
+							<CardHeader>
+								<CardTitle className="text-white flex items-center gap-2">
+									<div className="h-8 w-1 bg-primary rounded-full" />
+									Customer Details
+								</CardTitle>
+							</CardHeader>
+							<CardContent className="space-y-4">
+								<div className="flex items-center gap-2 mb-2">
+									<FormLabel className="text-gray-300">Customer</FormLabel>
+									{!isViewMode && (
+										<Button
+											type="button"
+											size="sm"
+											className="bg-blue-600 hover:bg-blue-700 text-white ml-auto"
+											onClick={() => setShowNewCustomer(true)}
+										>
+											<Plus className="h-4 w-4 mr-1" />
+											New Customer
+										</Button>
+									)}
 								</div>
-							)}
-						</CardContent>
-					</Card>
-
-					{/* Invoice Details */}
-					<Card className="bg-[#111827] border-[#1F2937]">
-						<CardHeader>
-							<CardTitle className="text-white">Invoice Details</CardTitle>
-						</CardHeader>
-						<CardContent className="space-y-4">
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								<div>
-									<Label className="text-gray-300">Invoice Number</Label>
-									<Input
-										value={invoiceData.invoiceNumber}
-										onChange={(e) => setInvoiceData(prev => ({ ...prev, invoiceNumber: e.target.value }))}
-										className="bg-[#0B0F19] border-[#1F2937] text-gray-300"
-									/>
-								</div>
-								<div>
-									<Label className="text-gray-300">Invoice Date</Label>
-									<Input
-										type="date"
-										value={invoiceData.invoiceDate}
-										onChange={(e) => setInvoiceData(prev => ({ ...prev, invoiceDate: e.target.value }))}
-										className="bg-[#0B0F19] border-[#1F2937] text-gray-300"
-									/>
-								</div>
-								<div>
-									<Label className="text-gray-300">Due Date</Label>
-									<Input
-										type="date"
-										value={invoiceData.dueDate}
-										onChange={(e) => setInvoiceData(prev => ({ ...prev, dueDate: e.target.value }))}
-										className="bg-[#0B0F19] border-[#1F2937] text-gray-300"
-									/>
-								</div>
-								<div>
-									<Label className="text-gray-300">Status</Label>
-									<Select value={invoiceData.status} onValueChange={(status: 'draft' | 'sent' | 'pending' | 'paid' | 'overdue') => setInvoiceData(prev => ({ ...prev, status }))}>
-										<SelectTrigger className="bg-[#0B0F19] border-[#1F2937] text-gray-300">
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent className="bg-[#111827] border-[#1F2937]">
-											<SelectItem value="draft" className="text-gray-300">Draft</SelectItem>
-											<SelectItem value="sent" className="text-gray-300">Sent</SelectItem>
-											<SelectItem value="pending" className="text-gray-300">Pending</SelectItem>
-											<SelectItem value="paid" className="text-gray-300">Paid</SelectItem>
-											<SelectItem value="overdue" className="text-gray-300">Overdue</SelectItem>
-										</SelectContent>
-									</Select>
-								</div>
-							</div>
-						</CardContent>
-					</Card>
-
-					{/* Items */}
-					<Card className="bg-[#111827] border-[#1F2937]">
-						<CardHeader className="flex flex-row items-center justify-between">
-							<CardTitle className="text-white">Rental Items</CardTitle>
-							<Button onClick={addItem} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-								<Plus className="h-4 w-4 mr-2" />
-								Add Item
-							</Button>
-						</CardHeader>
-						<CardContent className="space-y-4">
-							{invoiceData.items.map((item, index) => (
-								<div key={item.id} className="border border-[#1F2937] bg-[#0B0F19]/30 rounded-lg p-4 space-y-4 hover:border-blue-500/30 transition-colors group">
-									<div className="flex items-center justify-between">
-										<div className="flex items-center gap-2">
-											<div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 font-bold text-xs">
-												{index + 1}
-											</div>
-											<h4 className="text-white font-medium">Item Details</h4>
-										</div>
-										{invoiceData.items.length > 1 && (
-											<Button
-												variant="ghost"
-												size="sm"
-												onClick={() => removeItem(item.id)}
-												className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-											>
-												<Trash2 className="h-4 w-4" />
-											</Button>
-										)}
-									</div>
-									<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-										<div>
-											<div className="flex items-center justify-between mb-2">
-												<Label className="text-gray-300">Item Name</Label>
-												<Button 
-													variant="ghost" 
-													size="sm" 
-													className="h-6 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 text-xs px-2"
-													onClick={() => {
-														setActiveItemIndex(index);
-														setShowItemSelector(true);
-													}}
-												>
-													<Search className="h-3 w-3 mr-1" />
-													Search Catalog
-												</Button>
-											</div>
-											<Popover>
-												<PopoverTrigger asChild>
-													<Button
-														variant="outline"
-														role="combobox"
-														className={cn(
-															"w-full justify-between bg-[#0B0F19] border-[#1F2937] text-gray-300 font-normal hover:bg-[#0B0F19] hover:text-gray-300",
-															!item.itemName && "text-gray-500"
-														)}
-													>
-														{item.itemName || "Select or type item..."}
-														<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-													</Button>
-												</PopoverTrigger>
-												<PopoverContent className="w-[300px] p-0 bg-[#111827] border-[#1F2937]">
-													<Command className="bg-transparent">
-														<CommandInput 
-															placeholder="Search catalog..." 
-															className="text-gray-300"
-															onValueChange={(val) => {
-																// Allow typing custom name
-																if (!masterItems.some(m => m.name === val)) {
-																	updateItem(item.id, 'itemName', val);
-																}
-															}}
-														/>
-														<CommandList>
-															<CommandEmpty>No item found. Type to add custom.</CommandEmpty>
-															<CommandGroup>
-																{masterItems.map((mItem) => (
-																	<CommandItem
-																		key={mItem.id}
-																		value={mItem.name}
-																		onSelect={(currentValue) => {
-																			const selected = masterItems.find(m => m.name === currentValue);
-																			if (selected) {
-																				handleSelectItemFromCatalog(selected, index);
-																			}
-																		}}
-																		className="text-gray-300 hover:bg-[#1F2937] cursor-pointer"
-																	>
-																		<Check
-																			className={cn(
-																				"mr-2 h-4 w-4",
-																				item.itemName === mItem.name ? "opacity-100" : "opacity-0"
-																			)}
-																		/>
-																		<div className="flex flex-col">
-																			<span>{mItem.name}</span>
-																			<span className="text-[10px] text-gray-500">₹{mItem.pricePerDay}/day - {mItem.category}</span>
-																		</div>
-																	</CommandItem>
-																))}
-															</CommandGroup>
-														</CommandList>
-													</Command>
-												</PopoverContent>
-											</Popover>
-										</div>
-										<div>
-											<Label className="text-gray-300">Description</Label>
-											<Input
-												value={item.description}
-												onChange={(e) => updateItem(item.id, 'description', e.target.value)}
-												className="bg-[#0B0F19] border-[#1F2937] text-gray-300"
-											/>
-										</div>
-										<div>
-											<Label className="text-gray-300">Quantity</Label>
-											<Select 
-												value={item.quantity.toString()} 
-												onValueChange={(val) => updateItem(item.id, 'quantity', parseInt(val) || 1)}
-											>
-												<SelectTrigger className="bg-[#0B0F19] border-[#1F2937] text-gray-300">
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent className="bg-[#111827] border-[#1F2937] max-h-[200px]">
-													{[...Array(100)].map((_, i) => (
-														<SelectItem key={i+1} value={(i+1).toString()} className="text-gray-300">
-															{i+1}
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-										</div>
-										<div>
-											<Label className="text-gray-300">Days</Label>
-											<Select 
-												value={item.days.toString()} 
-												onValueChange={(val) => updateItem(item.id, 'days', parseInt(val) || 1)}
-											>
-												<SelectTrigger className="bg-[#0B0F19] border-[#1F2937] text-gray-300">
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent className="bg-[#111827] border-[#1F2937] max-h-[200px]">
-													{[...Array(100)].map((_, i) => (
-														<SelectItem key={i+1} value={(i+1).toString()} className="text-gray-300">
-															{i+1}
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-										</div>
-										<div>
-											<Label className="text-gray-300">Price per Day (₹)</Label>
-											<Input
-												type="number"
-												value={item.pricePerDay}
-												onChange={(e) => updateItem(item.id, 'pricePerDay', parseFloat(e.target.value) || 0)}
-												className="bg-[#0B0F19] border-[#1F2937] text-gray-300"
-												min="0"
-												step="0.01"
-											/>
-										</div>
-										<div>
-											<Label className="text-gray-300">Discount</Label>
-											<div className="flex gap-2">
-												<Input
-													type="number"
-													value={item.discount}
-													onChange={(e) => updateItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
-													className="bg-[#0B0F19] border-[#1F2937] text-gray-300 flex-1"
-													min="0"
-													step="0.01"
-												/>
-												<Select value={item.discountType} onValueChange={(value: 'amount' | 'percent') => updateItem(item.id, 'discountType', value)}>
-													<SelectTrigger className="w-20 bg-[#0B0F19] border-[#1F2937] text-gray-300">
-														<SelectValue />
+								<FormField
+									control={form.control}
+									name="customerId"
+									render={({ field }) => (
+										<FormItem>
+											<Select onValueChange={field.onChange} value={field.value} disabled={isViewMode}>
+												<FormControl>
+													<SelectTrigger className="bg-[#0B0F19] border-[#1F2937] text-white">
+														<SelectValue placeholder="Select a customer" />
 													</SelectTrigger>
+												</FormControl>
+												<SelectContent className="bg-[#111827] border-[#1F2937]">
+													{customers.map((customer) => (
+														<SelectItem key={customer.id} value={customer.id} className="text-white hover:bg-[#1F2937]">
+															{customer.name} - {customer.phone}
+														</SelectItem>
+													))}
+												</SelectContent>
+											</Select>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									<FormField
+										control={form.control}
+										name="customerName"
+										render={({ field }) => (
+											<FormItem>
+												<FormLabel className="text-gray-300">Name</FormLabel>
+												<FormControl>
+													<Input {...field} className="bg-[#0B0F19] border-[#1F2937] text-white" disabled={isViewMode} />
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+									<FormField
+										control={form.control}
+										name="customerPhone"
+										render={({ field }) => (
+											<FormItem>
+												<FormLabel className="text-gray-300">Phone</FormLabel>
+												<FormControl>
+													<Input {...field} className="bg-[#0B0F19] border-[#1F2937] text-white" disabled={isViewMode} />
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+								</div>
+							</CardContent>
+						</Card>
+
+						{/* Invoice Details */}
+						<Card className="bg-glass border-white/5 backdrop-blur-2xl glow-border">
+							<CardHeader>
+								<CardTitle className="text-white flex items-center gap-2">
+									<div className="h-8 w-1 bg-neon-blue rounded-full" />
+									Invoice Details
+								</CardTitle>
+							</CardHeader>
+							<CardContent className="space-y-4">
+								<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+									<FormField
+										control={form.control}
+										name="invoiceNumber"
+										render={({ field }) => (
+											<FormItem>
+												<FormLabel className="text-gray-300">Invoice Number</FormLabel>
+												<FormControl>
+													<Input {...field} className="bg-[#0B0F19] border-[#1F2937] text-white" disabled={isViewMode} />
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+									<FormField
+										control={form.control}
+										name="invoiceDate"
+										render={({ field }) => (
+											<FormItem>
+												<FormLabel className="text-gray-300">Invoice Date</FormLabel>
+												<FormControl>
+													<Input {...field} type="date" className="bg-[#0B0F19] border-[#1F2937] text-white" disabled={isViewMode} />
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+									<FormField
+										control={form.control}
+										name="dueDate"
+										render={({ field }) => (
+											<FormItem>
+												<FormLabel className="text-gray-300">Due Date</FormLabel>
+												<FormControl>
+													<Input {...field} type="date" className="bg-[#0B0F19] border-[#1F2937] text-white" disabled={isViewMode} />
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+								</div>
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									<FormField
+										control={form.control}
+										name="status"
+										render={({ field }) => (
+											<FormItem>
+												<FormLabel className="text-gray-300">Status</FormLabel>
+												<Select onValueChange={field.onChange} value={field.value} disabled={isViewMode}>
+													<FormControl>
+														<SelectTrigger className="bg-[#0B0F19] border-[#1F2937] text-white">
+															<SelectValue />
+														</SelectTrigger>
+													</FormControl>
 													<SelectContent className="bg-[#111827] border-[#1F2937]">
-														<SelectItem value="amount" className="text-gray-300">₹</SelectItem>
-														<SelectItem value="percent" className="text-gray-300">%</SelectItem>
+														<SelectItem value="draft" className="text-white">Draft</SelectItem>
+														<SelectItem value="sent" className="text-white">Sent</SelectItem>
+														<SelectItem value="pending" className="text-white">Pending</SelectItem>
+														<SelectItem value="paid" className="text-white">Paid</SelectItem>
+														<SelectItem value="overdue" className="text-white">Overdue</SelectItem>
 													</SelectContent>
 												</Select>
-											</div>
-										</div>
-										<div>
-											<Label className="text-gray-300">GST (%)</Label>
-											<Input
-												type="number"
-												value={item.gstPercent}
-												onChange={(e) => updateItem(item.id, 'gstPercent', parseFloat(e.target.value) || 0)}
-												className="bg-[#0B0F19] border-[#1F2937] text-gray-300"
-												min="0"
-												step="0.01"
-											/>
-										</div>
-										<div>
-											<Label className="text-gray-300">Total (₹)</Label>
-											<Input
-												type="number"
-												value={item.total.toFixed(2)}
-												readOnly
-												className="bg-[#1F2937] border-[#1F2937] text-gray-300"
-											/>
-										</div>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+									<div>
+										<Label className="text-gray-300">Payment Method</Label>
+										<PaymentSelector
+											selectedId={form.watch('paymentMethodId')}
+											onChange={(id) => form.setValue('paymentMethodId', id)}
+										/>
 									</div>
 								</div>
-							))}
-						</CardContent>
-					</Card>
+							</CardContent>
+						</Card>
 
-					{/* Summary */}
-					<Card className="bg-[#111827] border-[#1F2937]">
-						<CardHeader>
-							<CardTitle className="text-white">Invoice Summary</CardTitle>
-						</CardHeader>
-						<CardContent className="space-y-3">
-							<div className="flex justify-between text-gray-300">
-								<span>Subtotal:</span>
-								<span>₹{invoiceData.subtotal.toFixed(2)}</span>
-							</div>
-							<div className="flex justify-between text-gray-300">
-								<span>Total Discount:</span>
-								<span>-₹{invoiceData.totalDiscount.toFixed(2)}</span>
-							</div>
-							<div className="flex justify-between text-gray-300">
-								<span>Total GST:</span>
-								<span>₹{invoiceData.totalGST.toFixed(2)}</span>
-							</div>
-							<div className="border-t border-[#1F2937] pt-3 flex justify-between text-lg font-semibold text-white">
-								<span>Grand Total:</span>
-								<span>₹{invoiceData.grandTotal.toFixed(2)}</span>
-							</div>
-						</CardContent>
-					</Card>
+						{/* Items */}
+						<Card className="bg-glass border-white/5 backdrop-blur-2xl glow-border">
+							<CardHeader>
+								<div className="flex items-center justify-between">
+									<CardTitle className="text-white flex items-center gap-2">
+										<div className="h-8 w-1 bg-neon-purple rounded-full" />
+										Items
+									</CardTitle>
+									{!isViewMode && (
+										<Button type="button" onClick={addItem} className="bg-primary hover:bg-primary/90 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+											<Plus className="h-4 w-4 mr-2" />
+											Add Item
+										</Button>
+									)}
+								</div>
+							</CardHeader>
+							<CardContent>
+								<div className="space-y-4">
+									{fields.map((field, index) => (
+										<div key={field.id} className="border border-[#1F2937] rounded-lg p-4 space-y-4">
+											<div className="flex items-center justify-between">
+												<h4 className="text-white font-semibold">Item {index + 1}</h4>
+												{!isViewMode && fields.length > 1 && (
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														onClick={() => removeItem(index)}
+														className="text-red-400 hover:text-red-300"
+													>
+														<Trash2 className="h-4 w-4" />
+													</Button>
+												)}
+											</div>
+											<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+												<div className="md:col-span-1 lg:col-span-1">
+													<FormField
+														control={form.control}
+														name={`items.${index}.itemName`}
+														render={({ field }) => (
+															<FormItem>
+																<FormLabel className="text-gray-300">Item Name</FormLabel>
+																<div className="flex gap-1">
+																	<FormControl>
+																		<Input {...field} className="bg-[#0B0F19] border-[#1F2937] text-white" disabled={isViewMode} />
+																	</FormControl>
+																	{!isViewMode && (
+																		<Button
+																			type="button"
+																			variant="outline"
+																			size="sm"
+																			onClick={() => {
+																				setActiveItemIndex(index);
+																				setShowItemSelector(true);
+																			}}
+																			className="border-[#1F2937] text-gray-300 px-2"
+																		>
+																			<Search className="h-4 w-4" />
+																		</Button>
+																	)}
+																</div>
+																<FormMessage />
+															</FormItem>
+														)}
+													/>
+												</div>
+												<FormField
+													control={form.control}
+													name={`items.${index}.quantity`}
+													render={({ field }) => (
+														<FormItem>
+															<FormLabel className="text-gray-300">Qty</FormLabel>
+															<FormControl>
+																<Input {...field} type="number" min="1" className="bg-[#0B0F19] border-[#1F2937] text-white" disabled={isViewMode} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
+															</FormControl>
+															<FormMessage />
+														</FormItem>
+													)}
+												/>
+												<FormField
+													control={form.control}
+													name={`items.${index}.days`}
+													render={({ field }) => (
+														<FormItem>
+															<FormLabel className="text-gray-300">Days</FormLabel>
+															<FormControl>
+																<Input {...field} type="number" min="1" className="bg-[#0B0F19] border-[#1F2937] text-white" disabled={isViewMode} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
+															</FormControl>
+															<FormMessage />
+														</FormItem>
+													)}
+												/>
+												<FormField
+													control={form.control}
+													name={`items.${index}.pricePerDay`}
+													render={({ field }) => (
+														<FormItem>
+															<FormLabel className="text-gray-300">Price/Day</FormLabel>
+															<FormControl>
+																<Input {...field} type="number" min="0" step="0.01" className="bg-[#0B0F19] border-[#1F2937] text-white" disabled={isViewMode} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+															</FormControl>
+															<FormMessage />
+														</FormItem>
+													)}
+												/>
+												<div className="flex gap-2">
+													<div className="flex-1">
+														<FormField
+															control={form.control}
+															name={`items.${index}.discount`}
+															render={({ field }) => (
+																<FormItem>
+																	<FormLabel className="text-gray-300">Discount</FormLabel>
+																	<FormControl>
+																		<Input {...field} type="number" min="0" step="0.01" className="bg-[#0B0F19] border-[#1F2937] text-white" disabled={isViewMode} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+																	</FormControl>
+																	<FormMessage />
+																</FormItem>
+															)}
+														/>
+													</div>
+													<div className="w-16">
+														<FormField
+															control={form.control}
+															name={`items.${index}.discountType`}
+															render={({ field }) => (
+																<FormItem>
+																	<FormLabel className="text-gray-300">Type</FormLabel>
+																	<Select onValueChange={field.onChange} value={field.value} disabled={isViewMode}>
+																		<FormControl>
+																			<SelectTrigger className="bg-[#0B0F19] border-[#1F2937] text-white px-2">
+																				<SelectValue />
+																			</SelectTrigger>
+																		</FormControl>
+																		<SelectContent className="bg-[#111827] border-[#1F2937]">
+																			<SelectItem value="amount" className="text-white">₹</SelectItem>
+																			<SelectItem value="percent" className="text-white">%</SelectItem>
+																		</SelectContent>
+																	</Select>
+																</FormItem>
+															)}
+														/>
+													</div>
+												</div>
+												<FormField
+													control={form.control}
+													name={`items.${index}.gstPercent`}
+													render={({ field }) => (
+														<FormItem>
+															<FormLabel className="text-gray-300">GST %</FormLabel>
+															<Select onValueChange={val => field.onChange(parseInt(val))} value={field.value.toString()} disabled={isViewMode}>
+																<FormControl>
+																	<SelectTrigger className="bg-[#0B0F19] border-[#1F2937] text-white">
+																		<SelectValue />
+																	</SelectTrigger>
+																</FormControl>
+																<SelectContent className="bg-[#111827] border-[#1F2937]">
+																	<SelectItem value="0" className="text-white">0%</SelectItem>
+																	<SelectItem value="5" className="text-white">5%</SelectItem>
+																	<SelectItem value="12" className="text-white">12%</SelectItem>
+																	<SelectItem value="18" className="text-white">18%</SelectItem>
+																	<SelectItem value="28" className="text-white">28%</SelectItem>
+																</SelectContent>
+															</Select>
+															<FormMessage />
+														</FormItem>
+													)}
+												/>
+											</div>
+										</div>
+									))}
+								</div>
+							</CardContent>
+						</Card>
 
-					{/* Notes */}
-					<Card className="bg-[#111827] border-[#1F2937]">
-						<CardHeader>
-							<CardTitle className="text-white">Notes</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<Textarea
-								value={invoiceData.notes}
-								onChange={(e) => setInvoiceData(prev => ({ ...prev, notes: e.target.value }))}
-								className="bg-[#0B0F19] border-[#1F2937] text-gray-300"
-								placeholder="Add any additional notes..."
-								rows={4}
-							/>
-						</CardContent>
-					</Card>
+						{/* Summary */}
+						<Card className="bg-glass border-white/5 backdrop-blur-2xl glow-border overflow-hidden">
+							<div className="h-1 w-full bg-gradient-to-r from-primary via-neon-purple to-neon-pink" />
+							<CardHeader>
+								<CardTitle className="text-white">Summary</CardTitle>
+							</CardHeader>
+							<CardContent className="space-y-4">
+								<div className="space-y-3">
+									<div className="flex justify-between text-gray-400">
+										<span>Subtotal:</span>
+										<span>₹{form.watch('subtotal').toFixed(2)}</span>
+									</div>
+									<div className="flex justify-between text-red-400">
+										<span>Total Discount:</span>
+										<span>- ₹{form.watch('totalDiscount').toFixed(2)}</span>
+									</div>
+									<div className="flex justify-between text-blue-400">
+										<span>Total GST:</span>
+										<span>+ ₹{form.watch('totalGST').toFixed(2)}</span>
+									</div>
+									<div className="flex justify-between text-white font-bold text-xl border-t border-white/10 pt-4 mt-2">
+										<span>Grand Total:</span>
+										<span className="text-primary tracking-tight">₹{form.watch('grandTotal').toFixed(2)}</span>
+									</div>
+								</div>
+							</CardContent>
+						</Card>
 
-					{/* Actions */}
-					<div className="flex justify-end gap-4">
-						<Button variant="outline" onClick={() => navigate('/invoices')} className="border-[#1F2937] text-gray-300 hover:bg-[#1F2937]">
-							Cancel
-						</Button>
-						<Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white">
-							<Save className="h-4 w-4 mr-2" />
-							{id ? 'Update Invoice' : 'Create Invoice'}
-						</Button>
-					</div>
-				</div>
-
-			{/* Hidden Invoice Preview for PDF - Using absolute positioning instead of hidden class to allow capture */}
-			<div 
-				className="absolute opacity-0 pointer-events-none" 
-				style={{ left: '-9999px', top: '-9999px', width: '210mm' }}
-			>
-				<InvoicePreview invoice={invoiceData} id={id || 'new'} />
-			</div>
-
-			{/* Preview Modal */}
-			<Dialog open={showPreview} onOpenChange={setShowPreview}>
-				<DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-[#111827] border-[#1F2937]">
-					<DialogHeader className="sticky top-0 bg-[#111827] z-10 pr-10">
-						<DialogTitle className="text-white">Invoice Preview</DialogTitle>
-					</DialogHeader>
-					<div className="mt-4">
-						<InvoicePreview invoice={invoiceData} id={id || 'new'} />
-					</div>
-				</DialogContent>
-			</Dialog>
-
-			{/* New Customer Dialog */}
-			<Dialog open={showNewCustomer} onOpenChange={setShowNewCustomer}>
-				<DialogContent className="bg-[#111827] border-[#1F2937] max-w-md">
-					<DialogHeader>
-						<DialogTitle className="text-white">Add New Customer</DialogTitle>
-					</DialogHeader>
-					<div className="space-y-4">
-						<div>
-							<Label className="text-gray-300">Name *</Label>
-							<Input
-								value={newCustomer.name}
-								onChange={(e) => setNewCustomer(prev => ({ ...prev, name: e.target.value }))}
-								className="bg-[#0B0F19] border-[#1F2937] text-gray-300"
-								placeholder="Customer name"
-							/>
-						</div>
-						<div>
-							<Label className="text-gray-300">Phone</Label>
-							<Input
-								value={newCustomer.phone}
-								onChange={(e) => setNewCustomer(prev => ({ ...prev, phone: e.target.value }))}
-								className="bg-[#0B0F19] border-[#1F2937] text-gray-300"
-								placeholder="Phone number"
-							/>
-						</div>
-						<div>
-							<Label className="text-gray-300">Email</Label>
-							<Input
-								value={newCustomer.email}
-								onChange={(e) => setNewCustomer(prev => ({ ...prev, email: e.target.value }))}
-								className="bg-[#0B0F19] border-[#1F2937] text-gray-300"
-								placeholder="Email address"
-								type="email"
-							/>
-						</div>
-						<div>
-							<Label className="text-gray-300">Address</Label>
-							<Textarea
-								value={newCustomer.address}
-								onChange={(e) => setNewCustomer(prev => ({ ...prev, address: e.target.value }))}
-								className="bg-[#0B0F19] border-[#1F2937] text-gray-300"
-								placeholder="Street address"
-								rows={2}
-							/>
-						</div>
-						<div>
-							<Label className="text-gray-300">GSTIN</Label>
-							<Input
-								value={newCustomer.gstin}
-								onChange={(e) => setNewCustomer(prev => ({ ...prev, gstin: e.target.value }))}
-								className="bg-[#0B0F19] border-[#1F2937] text-gray-300"
-								placeholder="GSTIN (optional)"
-							/>
-						</div>
-						<div className="flex gap-3 pt-4">
-							<Button
-								variant="outline"
-								onClick={() => setShowNewCustomer(false)}
-								className="flex-1 border-[#1F2937] text-gray-300 hover:bg-[#1F2937]"
-							>
-								Cancel
-							</Button>
-							<Button
-								onClick={handleAddNewCustomer}
-								className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-							>
-								Add Customer
-							</Button>
-						</div>
-					</div>
-				</DialogContent>
-			</Dialog>
- 
-			{/* Item Catalog Selector Dialog */}
-			<Dialog open={showItemSelector} onOpenChange={setShowItemSelector}>
-				<DialogContent className="bg-[#111827] border-[#1F2937] max-w-2xl max-h-[80vh] overflow-hidden flex flex-col p-0">
-					<DialogHeader className="p-6 pb-0">
-						<DialogTitle className="text-white">Select Item from Catalog</DialogTitle>
-					</DialogHeader>
-					
-					<div className="p-6 flex-1 overflow-y-auto space-y-4">
-						<div className="relative mb-4">
-							<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-							<Input
-								placeholder="Search catalog items..."
-								value={itemSearchTerm}
-								onChange={(e) => setItemSearchTerm(e.target.value)}
-								className="pl-10 bg-[#0B0F19] border-[#1F2937] text-gray-300"
-							/>
-						</div>
-						
-						{masterItems.length === 0 ? (
-							<div className="text-center py-8">
-								<Package className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-								<p className="text-gray-400 mb-4">Your item catalog is empty.</p>
-								<Button 
-									onClick={() => navigate('/items')}
-									className="bg-blue-600 hover:bg-blue-700"
+						{/* Actions */}
+						<div className="flex justify-end gap-3 pb-8">
+							{!isViewMode && (
+								<Button
+									type="submit"
+									disabled={!form.formState.isValid}
+									className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
 								>
-									Manage Catalog
+									<Save className="h-4 w-4 mr-2" />
+									Save Invoice
 								</Button>
+							)}
+						</div>
+					</form>
+				</Form>
+
+				{/* New Customer Dialog */}
+				<Dialog open={showNewCustomer} onOpenChange={setShowNewCustomer}>
+					<DialogContent className="bg-[#111827] border-[#1F2937] text-white">
+						<DialogHeader>
+							<DialogTitle>Add New Customer</DialogTitle>
+						</DialogHeader>
+						<Form {...customerForm}>
+							<form onSubmit={customerForm.handleSubmit(handleAddCustomer)} className="space-y-4">
+								<FormField
+									control={customerForm.control}
+									name="name"
+									render={({ field }) => (
+										<FormItem>
+											<FormLabel>Name</FormLabel>
+											<FormControl>
+												<Input {...field} className="bg-[#0B0F19] border-[#1F2937] text-white" />
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+								<FormField
+									control={customerForm.control}
+									name="phone"
+									render={({ field }) => (
+										<FormItem>
+											<FormLabel>Phone</FormLabel>
+											<FormControl>
+												<Input {...field} className="bg-[#0B0F19] border-[#1F2937] text-white" />
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+								<FormField
+									control={customerForm.control}
+									name="email"
+									render={({ field }) => (
+										<FormItem>
+											<FormLabel>Email</FormLabel>
+											<FormControl>
+												<Input {...field} type="email" className="bg-[#0B0F19] border-[#1F2937] text-white" />
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+								<FormField
+									control={customerForm.control}
+									name="address"
+									render={({ field }) => (
+										<FormItem>
+											<FormLabel>Address</FormLabel>
+											<FormControl>
+												<Textarea {...field} className="bg-[#0B0F19] border-[#1F2937] text-white" />
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+								<FormField
+									control={customerForm.control}
+									name="gstin"
+									render={({ field }) => (
+										<FormItem>
+											<FormLabel>GSTIN (Optional)</FormLabel>
+											<FormControl>
+												<Input {...field} placeholder="22AAAAA0000A1Z5" className="bg-[#0B0F19] border-[#1F2937] text-white" />
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+								<DialogFooter>
+									<Button type="button" variant="outline" onClick={() => setShowNewCustomer(false)} className="bg-transparent border-[#1F2937] text-white">Cancel</Button>
+									<Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">Save Customer</Button>
+								</DialogFooter>
+							</form>
+						</Form>
+					</DialogContent>
+				</Dialog>
+
+				{/* Item Selector Dialog */}
+				<Dialog open={showItemSelector} onOpenChange={setShowItemSelector}>
+					<DialogContent className="bg-[#111827] border-[#1F2937] text-white max-w-2xl">
+						<DialogHeader>
+							<DialogTitle>Select Item from Catalog</DialogTitle>
+						</DialogHeader>
+						<div className="space-y-4">
+							<div className="relative">
+								<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+								<Input
+									placeholder="Search items..."
+									value={itemSearchTerm}
+									onChange={(e) => setItemSearchTerm(e.target.value)}
+									className="bg-[#0B0F19] border-[#1F2937] text-white pl-10"
+								/>
 							</div>
-						) : (
-							<div className="grid grid-cols-1 gap-3">
-								{masterItems
-									.filter(m => 
-										m.name.toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
-										m.category?.toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
-										m.description.toLowerCase().includes(itemSearchTerm.toLowerCase())
-									)
-									.map(mItem => (
-									<button
-										key={mItem.id}
-										onClick={() => handleSelectItemFromCatalog(mItem)}
-										className="flex flex-col p-4 bg-[#0B0F19] border border-[#1F2937] rounded-lg hover:border-blue-500 hover:bg-blue-500/5 transition-all text-left group"
+							<div className="max-h-60 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+								{filteredMasterItems.map((item) => (
+									<div
+										key={item.id}
+										className="p-3 border border-[#1F2937] rounded-lg hover:bg-[#1F2937] cursor-pointer transition-colors flex justify-between items-center group"
+										onClick={() => handleSelectItemFromCatalog(item)}
 									>
-										<div className="flex justify-between items-start w-full">
-											<span className="text-white font-semibold group-hover:text-blue-400">{mItem.name}</span>
-											<span className="text-blue-400 font-bold">₹{mItem.pricePerDay.toFixed(2)}/day</span>
+										<div>
+											<div className="font-semibold text-white group-hover:text-blue-400 transition-colors">{item.name}</div>
+											<div className="text-xs text-gray-500 mt-1">{item.category || 'General'}</div>
 										</div>
-										<p className="text-gray-400 text-sm mt-1 line-clamp-1">{mItem.description}</p>
-										<div className="flex gap-2 mt-2">
-											<Badge variant="outline" className="text-[10px] py-0">{mItem.category || 'General'}</Badge>
-											<Badge variant="outline" className="text-[10px] py-0">{mItem.gstPercent}% GST</Badge>
-										</div>
-									</button>
+										<div className="text-sm font-mono text-blue-400">₹{item.pricePerDay}/day</div>
+									</div>
 								))}
 							</div>
-						)}
-					</div>
-					
-					<DialogFooter className="p-6 pt-0">
-						<Button variant="outline" onClick={() => setShowItemSelector(false)} className="border-[#1F2937] text-gray-300">
-							Cancel
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+						</div>
+					</DialogContent>
+				</Dialog>
+
+				{/* Hidden Preview for PDF Generation */}
+				<div className="fixed -left-[9999px] top-0 pointer-events-none opacity-0">
+					<InvoicePreview 
+						invoice={form.getValues() as any} 
+						id={id || 'preview'} 
+					/>
+				</div>
+
+				<AnimatePresence>
+					{showPreview && (
+						<motion.div
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							exit={{ opacity: 0 }}
+							className="fixed inset-0 z-[100] flex items-start justify-center p-4 sm:p-10 bg-black/90 backdrop-blur-md overflow-y-auto"
+							onClick={() => setShowPreview(false)}
+						>
+							<motion.div
+								initial={{ y: -20, opacity: 0 }}
+								animate={{ y: 0, opacity: 1 }}
+								exit={{ y: -20, opacity: 0 }}
+								className="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl overflow-hidden"
+								onClick={(e) => e.stopPropagation()}
+							>
+								<div className="sticky top-0 right-0 z-20 flex justify-end p-2 bg-white/80 backdrop-blur-sm border-b">
+									<Button
+										variant="ghost"
+										size="icon"
+										onClick={() => setShowPreview(false)}
+										className="text-gray-400 hover:text-gray-900 transition-colors"
+									>
+										<X className="h-6 w-6" />
+									</Button>
+								</div>
+								<div className="overflow-y-visible">
+									<InvoicePreview invoice={form.getValues() as any} id={id || 'preview'} />
+								</div>
+							</motion.div>
+						</motion.div>
+					)}
+				</AnimatePresence>
 			</div>
 		</MainLayout>
 	);

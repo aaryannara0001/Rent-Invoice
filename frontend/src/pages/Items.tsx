@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Plus, Search, Trash2, Edit, Package } from 'lucide-react';
+import { Plus, Search, Trash2, Pencil, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,7 +15,9 @@ import { toast } from 'sonner';
 import { MasterItem } from '@/context/types';
 
 const Items = () => {
-	const { masterItems, addMasterItem, updateMasterItem, deleteMasterItem } = useApp();
+	const { masterItems, addMasterItem, updateMasterItem, deleteMasterItem, role } = useApp();
+	const isEditor = role === 'editor';
+	
 	const [searchTerm, setSearchTerm] = useState('');
 	const [searchQuery, setSearchQuery] = useState('');
 	const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
@@ -36,7 +38,7 @@ const Items = () => {
 	const filteredItems = masterItems.filter(item =>
 		item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
 		item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-		item.category?.toLowerCase().includes(searchTerm.toLowerCase())
+		(item.category && item.category.toLowerCase().includes(searchTerm.toLowerCase()))
 	);
  
 	const handleSearch = () => {
@@ -50,6 +52,7 @@ const Items = () => {
 	};
 
 	const handleOpenAddDialog = () => {
+		if (!isEditor) return;
 		setEditingItem(null);
 		setFormData({
 			name: '',
@@ -62,6 +65,7 @@ const Items = () => {
 	};
 
 	const handleOpenEditDialog = (item: MasterItem) => {
+		if (!isEditor) return;
 		setEditingItem(item);
 		setFormData({
 			name: item.name,
@@ -74,6 +78,7 @@ const Items = () => {
 	};
 
 	const handleSaveItem = () => {
+		if (!isEditor) return;
 		if (!formData.name || formData.pricePerDay < 0) {
 			toast.error('Please fill in all required fields correctly');
 			return;
@@ -101,6 +106,7 @@ const Items = () => {
 	};
 
 	const handleDeleteItem = () => {
+		if (!isEditor) return;
 		if (itemToDelete) {
 			deleteMasterItem(itemToDelete);
 			setDeleteDialogOpen(false);
@@ -118,10 +124,12 @@ const Items = () => {
 						<Package className="h-6 sm:h-8 w-6 sm:w-8 text-blue-500" />
 						<h1 className="text-2xl sm:text-3xl font-bold text-white">Rental Items</h1>
 					</div>
-					<Button className="bg-blue-600 hover:bg-blue-700 text-white text-sm w-full sm:w-auto" onClick={handleOpenAddDialog}>
-						<Plus className="h-4 w-4 mr-2" />
-						Add Item
-					</Button>
+					{isEditor && (
+						<Button className="bg-blue-600 hover:bg-blue-700 text-white text-sm w-full sm:w-auto" onClick={handleOpenAddDialog}>
+							<Plus className="h-4 w-4 mr-2" />
+							Add Item
+						</Button>
+					)}
 				</div>
 
 				{/* Search */}
@@ -167,11 +175,13 @@ const Items = () => {
 						{filteredItems.length === 0 ? (
 							<div className="text-center py-12">
 								<Package className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-								<p className="text-gray-500">No items found. Add items to build your rental catalog.</p>
-								<Button className="mt-4 bg-blue-600 hover:bg-blue-700 text-white" onClick={handleOpenAddDialog}>
-									<Plus className="h-4 w-4 mr-2" />
-									Add First Item
-								</Button>
+								<p className="text-gray-500">No items found. {isEditor ? 'Add items to build your rental catalog.' : ''}</p>
+								{isEditor && (
+									<Button className="mt-4 bg-blue-600 hover:bg-blue-700 text-white" onClick={handleOpenAddDialog}>
+										<Plus className="h-4 w-4 mr-2" />
+										Add First Item
+									</Button>
+								)}
 							</div>
 						) : (
 							<div className="overflow-x-auto">
@@ -200,25 +210,31 @@ const Items = () => {
 												<TableCell className="text-gray-300 text-sm max-w-xs truncate">{item.description}</TableCell>
 												<TableCell className="text-right">
 													<div className="flex justify-end gap-2">
-														<Button
-															variant="ghost"
-															size="sm"
-															className="text-gray-400 hover:text-gray-300 hover:bg-gray-500/10"
-															onClick={() => handleOpenEditDialog(item)}
-														>
-															<Edit className="h-4 w-4" />
-														</Button>
-														<Button
-															variant="ghost"
-															size="sm"
-															className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-															onClick={() => {
-																setItemToDelete(item.id);
-																setDeleteDialogOpen(true);
-															}}
-														>
-															<Trash2 className="h-4 w-4" />
-														</Button>
+														{isEditor && (
+															<>
+																<Button
+																	variant="ghost"
+																	size="sm"
+																	className="text-gray-400 hover:text-gray-300 hover:bg-gray-500/10"
+																	onClick={() => handleOpenEditDialog(item)}
+																	title="Edit"
+																>
+																	<Pencil className="h-4 w-4" />
+																</Button>
+																<Button
+																	variant="ghost"
+																	size="sm"
+																	className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+																	onClick={() => {
+																		setItemToDelete(item.id);
+																		setDeleteDialogOpen(true);
+																	}}
+																	title="Delete"
+																>
+																	<Trash2 className="h-4 w-4" />
+																</Button>
+															</>
+														)}
 													</div>
 												</TableCell>
 											</TableRow>

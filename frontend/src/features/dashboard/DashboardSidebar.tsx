@@ -6,6 +6,7 @@ import {
   BarChart3,
   Package,
   ChevronLeft,
+  Landmark,
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,9 +27,11 @@ const navItems = [
   { title: "Invoices", url: "/invoices", icon: FileText },
   { title: "Quotes", url: "/quotes", icon: Quote },
   { title: "Customers", url: "/customers", icon: Users },
+  { title: "Bank Details", url: "/bank-details", icon: Landmark },
   { title: "Reports", url: "/reports", icon: BarChart3 },
   { title: "Items", url: "/items", icon: Package },
 ];
+
 
 export function DashboardSidebar() {
   const { state, toggleSidebar } = useSidebar();

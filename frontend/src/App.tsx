@@ -14,6 +14,19 @@ import CreateInvoice from "./pages/CreateInvoice.tsx";
 import CreateQuote from "./pages/CreateQuote.tsx";
 import Reports from "./pages/Reports.tsx";
 import Items from "./pages/Items.tsx";
+import BankDetails from "./pages/BankDetails.tsx";
+import Login from "./pages/Login.tsx";
+import Profile from "./pages/Profile.tsx";
+import Settings from "./pages/Settings.tsx";
+import { Navigate } from "react-router-dom";
+import { useApp } from "@/context/useApp";
+
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+	const { isAuthenticated } = useApp();
+	if (!isAuthenticated) return <Navigate to="/login" replace />;
+	return <>{children}</>;
+};
+
 
 const queryClient = new QueryClient();
 
@@ -25,17 +38,23 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/invoices" element={<Invoices />} />
-            <Route path="/invoices/create" element={<CreateInvoice />} />
-            <Route path="/invoices/:id" element={<CreateInvoice />} />
-            <Route path="/quotes" element={<Quotes />} />
-            <Route path="/quotes/create" element={<CreateQuote />} />
-            <Route path="/quotes/:id" element={<CreateQuote />} />
-            <Route path="/customers" element={<Customers />} />
-            <Route path="/customers/:id" element={<CustomerDetail />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/items" element={<Items />} />
+            <Route path="/login" element={<Login />} />
+            
+            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
+            <Route path="/invoices/create" element={<ProtectedRoute><CreateInvoice /></ProtectedRoute>} />
+            <Route path="/invoices/:id" element={<ProtectedRoute><CreateInvoice /></ProtectedRoute>} />
+            <Route path="/quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
+            <Route path="/quotes/create" element={<ProtectedRoute><CreateQuote /></ProtectedRoute>} />
+            <Route path="/quotes/:id" element={<ProtectedRoute><CreateQuote /></ProtectedRoute>} />
+            <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+            <Route path="/customers/:id" element={<ProtectedRoute><CustomerDetail /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+            <Route path="/items" element={<ProtectedRoute><Items /></ProtectedRoute>} />
+            <Route path="/bank-details" element={<ProtectedRoute><BankDetails /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

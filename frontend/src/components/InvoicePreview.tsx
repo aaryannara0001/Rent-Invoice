@@ -1,5 +1,6 @@
 import React from 'react';
 import { Invoice } from '@/context/types';
+import { useApp } from '@/context/useApp';
 
 interface InvoicePreviewProps {
 	invoice: Invoice | Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>;
@@ -7,6 +8,9 @@ interface InvoicePreviewProps {
 }
 
 const InvoicePreview: React.FC<InvoicePreviewProps> = ({ invoice, id }) => {
+	const { paymentMethods } = useApp();
+	const paymentMethod = paymentMethods.find(m => m.id === invoice.paymentMethodId);
+
 	return (
 		<div
 			id={`invoice-${id || 'preview'}`}
@@ -29,8 +33,9 @@ const InvoicePreview: React.FC<InvoicePreviewProps> = ({ invoice, id }) => {
 				<div className="grid grid-cols-2 gap-8 py-6 border-t-2 border-b-2">
 					<div>
 						<p className="font-bold text-lg mb-2">From:</p>
-						<p className="text-gray-700">Your Company Name</p>
-						<p className="text-gray-700">Company Address</p>
+						<p className="text-gray-700">Digital Rent Flow</p>
+						<p className="text-gray-700">123 Business Avenue</p>
+						<p className="text-gray-700">Bangalore, KA 560001</p>
 					</div>
 					<div>
 						<p className="font-bold text-lg mb-2">Bill To:</p>
@@ -90,8 +95,27 @@ const InvoicePreview: React.FC<InvoicePreviewProps> = ({ invoice, id }) => {
 					</table>
 				</div>
 
-				{/* Totals */}
-				<div className="flex justify-end">
+				{/* Totals and Payment Info */}
+				<div className="flex justify-between gap-8 pt-4">
+					<div className="flex-1">
+						{paymentMethod && (
+							<div className="bg-gray-50 p-4 rounded-lg border">
+								<p className="font-bold text-gray-800 mb-2 underline">PAYMENT DETAILS</p>
+								{paymentMethod.type === 'bank' ? (
+									<div className="text-sm space-y-1">
+										<p><span className="font-semibold">Account Holder:</span> {paymentMethod.accountHolderName}</p>
+										<p><span className="font-semibold">Bank Name:</span> {paymentMethod.bankName}</p>
+										<p><span className="font-semibold">Account Number:</span> {paymentMethod.accountNumber}</p>
+										<p><span className="font-semibold">IFSC Code:</span> {paymentMethod.ifscCode}</p>
+									</div>
+								) : (
+									<div className="text-sm space-y-1">
+										<p><span className="font-semibold">UPI ID:</span> {paymentMethod.upiId}</p>
+									</div>
+								)}
+							</div>
+						)}
+					</div>
 					<div className="w-64">
 						<div className="flex justify-between py-2 border-t-2">
 							<span>Subtotal:</span>
@@ -130,3 +154,4 @@ const InvoicePreview: React.FC<InvoicePreviewProps> = ({ invoice, id }) => {
 };
 
 export default InvoicePreview;
+
