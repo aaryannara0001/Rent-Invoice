@@ -4,7 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { AppContext, AppContextType, Invoice, Quote, Customer, MasterItem, PaymentMethod, User } from './types';
 import { toast } from 'sonner';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = import.meta.env.PROD 
+    ? '/api' 
+    : 'http://localhost:8000';
 
 const STORAGE_KEYS = {
 	INVOICES: 'rental_invoices',
