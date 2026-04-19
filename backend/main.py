@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import os
 from src.routes import auth, data, analytics
 
 app = FastAPI(title="RentFlow API")
@@ -14,9 +15,12 @@ app.add_middleware(
 )
 
 # Register Routers
-app.include_router(auth.router)
-app.include_router(data.router)
-app.include_router(analytics.router)
+# Include routes with potential /api prefix for Vercel
+api_prefix = "/api" if os.getenv("VERCEL") else ""
+
+app.include_router(auth.router, prefix=api_prefix)
+app.include_router(data.router, prefix=api_prefix)
+app.include_router(analytics.router, prefix=api_prefix)
 
 @app.get("/")
 async def root():
