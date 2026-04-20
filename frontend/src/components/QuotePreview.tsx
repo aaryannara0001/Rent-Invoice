@@ -12,199 +12,188 @@ const QuotePreview: React.FC<QuotePreviewProps> = ({ quote, id }) => {
 	const { paymentMethods } = useApp();
 	const paymentMethod = paymentMethods.find(m => m.id === quote.paymentMethodId);
 
+	// Using Brand Colors from the Logo
+	const brandBlue = '#01549B';
+	const brandGreen = '#2E7D32';
+
 	return (
 		<div
 			id={`quote-${id || 'preview'}`}
-			className="p-4 bg-white text-black border-[3px] border-black max-w-[210mm] mx-auto text-[11px] leading-tight"
+			className="p-8 bg-white text-[#1A1A1A] max-w-[210mm] mx-auto text-[11px] font-sans antialiased"
+			style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}
 		>
-			{/* Top Header */}
-			<div className="flex border-b border-black">
-				<div className="flex-1 p-2 flex items-center gap-4">
-					<img src="/logo.png" alt="Logo" className="h-12 w-auto object-contain" />
-					<div>
-						<h1 className="text-xl font-bold uppercase leading-none">Rent My EVENT</h1>
-						<p className="text-[9px] font-semibold tracking-tighter">STYLE YOUR MOMENT</p>
-						<div className="mt-1 text-[9px] leading-tight">
-							<p>A123 Main Road Mandawali Fazelfur Near New Delhi, 110092</p>
-							<div className="flex gap-4">
-								<p>GSTIN: 07KRDPO7397PZT</p>
-								<p>State: Delhi (07)</p>
-							</div>
-							<div className="flex gap-4">
-								<p>Mobile: +91 9625340107</p>
-								<p>Email: Rentmyevents@gmail.com</p>
-							</div>
-						</div>
+			{/* Top Decorative bar */}
+			<div className="h-1.5 w-full bg-gradient-to-r from-[#01549B] via-[#0288D1] to-[#2E7D32] mb-6" />
+
+			{/* Header Section */}
+			<div className="flex justify-between items-start mb-8">
+				<div className="flex gap-4">
+					<img src="/logo.png" alt="Logo" className="h-20 w-auto object-contain" />
+					<div className="border-l-2 border-gray-100 pl-4">
+						<h1 className="text-2xl font-black text-[#01549B] uppercase tracking-tight">Rent My EVENT</h1>
+						<p className="text-[10px] font-bold text-[#2E7D32] tracking-[0.2em] uppercase mb-2">Style Your Moment</p>
+						<p className="text-gray-500 max-w-[200px]">A123 Main Road Mandawali Fazelfur, Near New Delhi, 110092</p>
+						<p className="text-gray-500">GSTIN: <span className="text-black font-semibold">07KRDPO7397PZT</span></p>
 					</div>
 				</div>
-				<div className="w-[180px] border-l border-black p-2 bg-gray-50 flex flex-col justify-between">
-					<h2 className="text-xl font-bold text-center border-b border-black pb-1 mb-1">QUOTATION</h2>
-					<div className="space-y-1 text-[10px]">
-						<div className="flex justify-between">
-							<span className="font-bold">No:</span>
-							<span>{quote.quoteNumber}</span>
-						</div>
-						<div className="flex justify-between">
-							<span className="font-bold">Date:</span>
-							<span>{quote.quoteDate}</span>
-						</div>
-						<div className="flex justify-between">
-							<span className="font-bold">Payment Terms:</span>
-							<span>-</span>
-						</div>
+				<div className="text-right">
+					<h2 className="text-4xl font-black text-gray-100 uppercase leading-none mb-1">QUOTATION</h2>
+					<div className="space-y-1">
+						<p className="font-bold text-gray-400">NO: <span className="text-black">{quote.quoteNumber}</span></p>
+						<p className="font-bold text-gray-400">DATE: <span className="text-black">{quote.quoteDate}</span></p>
 					</div>
 				</div>
 			</div>
 
-			{/* Bill To / Ship To */}
-			<div className="flex border-b border-black">
-				<div className="flex-1 p-2 border-r border-black">
-					<div className="bg-gray-200 px-2 py-0.5 border border-black mb-1 font-bold text-[10px]">BILL TO</div>
-					<div className="px-1 space-y-0.5 font-semibold">
-						<p className="text-sm font-bold uppercase">{quote.customerName}</p>
-						<p className="text-gray-700">{quote.customerAddress}</p>
-						<div className="flex gap-4 mt-1">
-							<p><span className="font-bold">GSTIN:</span> {quote.customerGstin || '-'}</p>
-							<p><span className="font-bold">State:</span> -</p>
+			{/* Info Boxes */}
+			<div className="grid grid-cols-2 gap-8 mb-8">
+				<div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+					<p className="text-[10px] font-black text-[#01549B] uppercase tracking-wider mb-2">Client Details</p>
+					<div className="space-y-1">
+						<p className="text-base font-bold text-black uppercase">{quote.customerName}</p>
+						<p className="text-gray-600 leading-relaxed">{quote.customerAddress}</p>
+						<div className="flex gap-4 mt-2">
+							<p className="text-[10px]"><span className="text-gray-400">PHONE:</span> {quote.customerPhone}</p>
+							<p className="text-[10px]"><span className="text-gray-400">EMAIL:</span> {quote.customerEmail}</p>
 						</div>
 					</div>
 				</div>
-				<div className="flex-1 p-2">
-					<div className="bg-gray-200 px-2 py-0.5 border border-black mb-1 font-bold text-[10px]">SHIP TO</div>
-					<div className="px-1 space-y-0.5 font-semibold">
-						<p className="text-sm font-bold uppercase">{quote.customerName}</p>
-						<p className="text-gray-700">{quote.customerAddress}</p>
-						<div className="flex gap-4 mt-1">
-							<p><span className="font-bold">GSTIN:</span> {quote.customerGstin || '-'}</p>
-							<p><span className="font-bold">State:</span> -</p>
-						</div>
+				<div className="p-4 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+					<p className="text-[10px] font-black text-[#2E7D32] uppercase tracking-wider mb-2">Event Details</p>
+					<div className="space-y-1 text-gray-600">
+						<p><span className="font-bold text-gray-400 uppercase">Location:</span> {quote.eventLocation || 'Venue to be confirmed'}</p>
+						<p><span className="font-bold text-gray-400 uppercase">Event:</span> {quote.eventName || '-'}</p>
+						<p><span className="font-bold text-gray-400 uppercase">Valid Thru:</span> <span className="text-black font-bold">{quote.validUntil}</span></p>
 					</div>
 				</div>
 			</div>
 
-			{/* Items Table */}
-			<div className="w-full">
+			{/* Table Title */}
+			<div className="mb-2 px-1 flex justify-between items-end">
+				<h3 className="text-sm font-black uppercase text-gray-800">Rental Equipment Services</h3>
+				<span className="text-[10px] text-gray-400 italic">All prices in Indian Rupees (INR)</span>
+			</div>
+
+			{/* Items Table - Clean Modern Style */}
+			<div className="rounded-xl border border-gray-100 overflow-hidden shadow-sm mb-8">
 				<table className="w-full border-collapse">
 					<thead>
-						<tr className="bg-gray-100 text-[10px] uppercase font-bold text-center">
-							<th className="border border-black p-1 w-8">Sr.</th>
-							<th className="border border-black p-1">Description</th>
-							<th className="border border-black p-1 w-16">HSN</th>
-							<th className="border border-black p-1 w-20">Rate (₹)</th>
-							<th className="border border-black p-1 w-12">Qty</th>
-							<th className="border border-black p-1 w-24">Taxable Value (₹)</th>
-							<th className="border border-black p-1 w-16">GST%</th>
-							<th className="border border-black p-1 w-24">Amount (₹)</th>
+						<tr className="bg-[#01549B] text-white text-[10px] uppercase font-bold text-center">
+							<th className="p-3 w-10">#</th>
+							<th className="p-3 text-left">Product / Service Description</th>
+							<th className="p-3 w-16">HSN</th>
+							<th className="p-3 w-20">Rate</th>
+							<th className="p-3 w-12">Qty</th>
+							<th className="p-3 w-16">Days</th>
+							<th className="p-3 w-28">Total Amount</th>
 						</tr>
 					</thead>
-					<tbody>
+					<tbody className="text-center font-medium divide-y divide-gray-50">
 						{quote.items.map((item, idx) => {
 							const taxableValue = item.quantity * item.days * item.pricePerDay;
 							const discount = item.discountType === 'percent'
 								? (taxableValue * item.discount) / 100
 								: item.discount;
-							const afterDiscount = taxableValue - discount;
-							const gst = (afterDiscount * item.gstPercent) / 100;
-							const amount = afterDiscount + gst;
+							const total = taxableValue - discount + ((taxableValue - discount) * item.gstPercent / 100);
 
 							return (
-								<tr key={idx} className="text-center font-medium">
-									<td className="border border-black p-1 h-8">{idx + 1}</td>
-									<td className="border border-black p-1 text-left">
-										<p className="font-bold">{item.itemName}</p>
-										{item.description && <p className="text-[9px] text-gray-600 font-normal">{item.description}</p>}
+								<tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}>
+									<td className="p-3 text-gray-400 font-bold">{idx + 1}</td>
+									<td className="p-3 text-left">
+										<p className="font-bold text-black uppercase">{item.itemName}</p>
+										{item.description && <p className="text-[9px] text-gray-500 leading-tight mt-0.5">{item.description}</p>}
 									</td>
-									<td className="border border-black p-1">-</td>
-									<td className="border border-black p-1 text-right">{item.pricePerDay.toFixed(2)}</td>
-									<td className="border border-black p-1">{item.quantity}</td>
-									<td className="border border-black p-1 text-right">{taxableValue.toFixed(2)}</td>
-									<td className="border border-black p-1">{item.gstPercent}%</td>
-									<td className="border border-black p-1 text-right font-bold">{amount.toFixed(2)}</td>
+									<td className="p-3 text-gray-400">99731x</td>
+									<td className="p-3">₹{item.pricePerDay.toLocaleString('en-IN')}</td>
+									<td className="p-3">{item.quantity}</td>
+									<td className="p-3">{item.days}</td>
+									<td className="p-3 font-bold text-[#01549B]">₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
 								</tr>
 							);
 						})}
-						{/* Padding rows to maintain height if few items */}
-						{[...Array(Math.max(0, 5 - quote.items.length))].map((_, i) => (
-							<tr key={`empty-${i}`} className="h-8">
-								<td className="border border-black p-1"></td>
-								<td className="border border-black p-1"></td>
-								<td className="border border-black p-1"></td>
-								<td className="border border-black p-1"></td>
-								<td className="border border-black p-1"></td>
-								<td className="border border-black p-1"></td>
-								<td className="border border-black p-1"></td>
-								<td className="border border-black p-1"></td>
-							</tr>
-						))}
-						{/* Table Footer */}
-						<tr className="font-bold bg-gray-50 uppercase text-[10px]">
-							<td colSpan={5} className="border border-black p-1 text-right">Total:</td>
-							<td className="border border-black p-1 text-right">{quote.subtotal.toFixed(2)}</td>
-							<td className="border border-black p-1"></td>
-							<td className="border border-black p-1 text-right">{quote.grandTotal.toFixed(2)}</td>
-						</tr>
 					</tbody>
 				</table>
 			</div>
 
-			{/* Bank Details & Summary Section */}
-			<div className="flex border-x border-b border-black">
-				<div className="flex-1 p-2 border-r border-black font-semibold space-y-1">
-					<p className="font-bold text-[10px] uppercase border-b border-black/20 pb-0.5 mb-1">BANK DETAILS</p>
-					{paymentMethod && paymentMethod.type === 'bank' ? (
-						<div className="grid grid-cols-[80px_1fr] gap-x-2 text-[10px]">
-							<span className="font-bold">Bank:</span> <span>{paymentMethod.bankName}</span>
-							<span className="font-bold">A/c No.:</span> <span>{paymentMethod.accountNumber}</span>
-							<span className="font-bold">IFSC Code:</span> <span>{paymentMethod.ifscCode}</span>
-							<span className="font-bold">Branch:</span> <span>-</span>
-							<span className="font-bold">Account Holder:</span> <span>{paymentMethod.accountHolderName}</span>
+			{/* Summary Section */}
+			<div className="grid grid-cols-5 gap-8 mb-8">
+				<div className="col-span-3 space-y-4">
+					<div className="p-4 bg-gray-50 rounded-xl space-y-2">
+						<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-1">Payment Method</p>
+						{paymentMethod && paymentMethod.type === 'bank' ? (
+							<div className="grid grid-cols-2 gap-2 text-[10px]">
+								<div>
+									<p className="text-gray-400 uppercase font-black text-[8px]">Account Name</p>
+									<p className="font-bold">{paymentMethod.accountHolderName}</p>
+								</div>
+								<div>
+									<p className="text-gray-400 uppercase font-black text-[8px]">Bank & Branch</p>
+									<p className="font-bold">{paymentMethod.bankName}</p>
+								</div>
+								<div>
+									<p className="text-gray-400 uppercase font-black text-[8px]">Account Number</p>
+									<p className="font-bold">{paymentMethod.accountNumber}</p>
+								</div>
+								<div>
+									<p className="text-gray-400 uppercase font-black text-[8px]">IFSC Code</p>
+									<p className="font-bold">{paymentMethod.ifscCode}</p>
+								</div>
+							</div>
+						) : (
+							<p className="text-gray-400 italic">Payment details to be provided separately</p>
+						)}
+					</div>
+					<div className="px-2">
+						<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">In Words</p>
+						<p className="font-bold italic text-[#2E7D32] text-sm">{numberToWords(quote.grandTotal)}</p>
+					</div>
+				</div>
+				<div className="col-span-2 bg-[#01549B] text-white p-6 rounded-2xl shadow-xl shadow-blue-900/10 relative overflow-hidden">
+					{/* Decorative circle */}
+					<div className="absolute -right-4 -bottom-4 h-24 w-24 bg-white/5 rounded-full" />
+					
+					<div className="relative z-10 space-y-3">
+						<div className="flex justify-between items-center text-white/60">
+							<span className="font-bold uppercase tracking-widest text-[9px]">Subtotal (Taxable)</span>
+							<span className="font-bold">₹{quote.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
 						</div>
-					) : (
-						<p className="text-gray-400 text-[10px]">No bank details provided</p>
-					)}
-				</div>
-				<div className="w-[300px]">
-					<div className="grid grid-cols-[1fr_100px] border-b border-black font-bold text-[10px]">
-						<div className="p-1 uppercase">Taxable Value:</div>
-						<div className="p-1 border-l border-black text-right">₹{quote.subtotal.toFixed(2)}</div>
-					</div>
-					<div className="grid grid-cols-[1fr_100px] border-b border-black font-bold text-[10px]">
-						<div className="p-1 uppercase text-red-600">Total Discount:</div>
-						<div className="p-1 border-l border-black text-right text-red-600">- ₹{quote.totalDiscount.toFixed(2)}</div>
-					</div>
-					<div className="grid grid-cols-[1fr_100px] border-b border-black font-bold text-[10px]">
-						<div className="p-1 uppercase">GST ({quote.items[0]?.gstPercent || 18}%):</div>
-						<div className="p-1 border-l border-black text-right">₹{quote.totalGST.toFixed(2)}</div>
-					</div>
-					<div className="grid grid-cols-[1fr_100px] bg-gray-50 font-bold text-xs">
-						<div className="p-1.5 uppercase">GRAND TOTAL:</div>
-						<div className="p-1.5 border-l border-black text-right text-blue-800">₹{quote.grandTotal.toFixed(2)}</div>
+						<div className="flex justify-between items-center text-white/60">
+							<span className="font-bold uppercase tracking-widest text-[9px]">Cumulative GST</span>
+							<span className="font-bold">₹{quote.totalGST.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+						</div>
+						<div className="flex justify-between items-center text-red-300">
+							<span className="font-bold uppercase tracking-widest text-[9px]">Total Discount</span>
+							<span className="font-bold">-₹{quote.totalDiscount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+						</div>
+						<div className="pt-4 border-t border-white/10 mt-4 h-16 flex flex-col justify-end">
+							<p className="font-black uppercase tracking-[0.2em] text-[8px] text-white/40 leading-none mb-1">Grand Total Payable</p>
+							<div className="flex justify-between items-baseline text-2xl font-black">
+								<span className="text-lg">₹</span>
+								<span>{quote.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
 
-			{/* Amount in Words */}
-			<div className="border border-black mt-2 p-2 relative">
-				<p className="text-[8px] absolute -top-2 left-2 bg-white px-1 font-bold uppercase text-gray-500">Amount in Words</p>
-				<p className="font-bold italic text-gray-700">{numberToWords(quote.grandTotal)}</p>
+			{/* Signature & Remarks */}
+			<div className="grid grid-cols-2 gap-12 mt-12">
+				<div className="space-y-4">
+					<div className="border border-gray-100 rounded-xl p-4">
+						<p className="font-black uppercase text-[9px] text-gray-400 mb-2">Terms & Remarks</p>
+						<p className="text-gray-600 italic leading-relaxed">{quote.notes || 'Please confirm the quote within 7 days of issuance.'}</p>
+					</div>
+				</div>
+				<div className="flex flex-col items-center justify-center p-6 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+					<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-8">Authorized Signature for Rent My Event</p>
+					<div className="h-0.5 w-3/4 bg-gray-300" />
+					<p className="mt-2 text-[9px] font-bold text-[#01549B]">Proprietor / Signatory</p>
+				</div>
 			</div>
 
-			{/* Remarks */}
-			<div className="border border-black mt-2 min-h-12 relative p-2">
-				<p className="text-[8px] absolute -top-2 left-2 bg-white px-1 font-bold uppercase text-gray-500">Remarks</p>
-				<p className="text-gray-700">{quote.notes || 'No remarks'}</p>
-			</div>
-
-			{/* Footer Signatures */}
-			<div className="mt-4 grid grid-cols-2 gap-8 h-24">
-				<div className="border border-black relative flex flex-col justify-end p-1 text-center bg-gray-50/30">
-					<p className="text-[8px] absolute top-1 left-2 font-bold uppercase">For Rent My EVENT</p>
-					<div className="border-t border-black w-2/3 mx-auto pb-1 font-bold text-[9px] uppercase">Authorized Signatory</div>
-				</div>
-				<div className="border border-black relative flex flex-col justify-end p-1 text-center bg-gray-50/30">
-					<p className="text-[8px] absolute top-1 right-2 font-bold uppercase">Receiver's Signature</p>
-					<div className="border-t border-black w-2/3 mx-auto pb-1 font-bold text-[9px] uppercase">Seal & Signature</div>
-				</div>
+			{/* Final Footer */}
+			<div className="mt-12 text-center">
+				<p className="text-[10px] font-bold text-gray-300 tracking-[0.3em] uppercase">Built with precision by Digital Rent Flow</p>
 			</div>
 		</div>
 	);
