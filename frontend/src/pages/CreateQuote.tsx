@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Download, Eye, Search, Save, X } from 'lucide-react';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -113,8 +113,8 @@ const CreateQuote = () => {
 		}
 	}, [watchedCustomerId, customers, form]);
 
-	// Calculate totals
-	useEffect(() => {
+	// Calculate totals reactively
+	const totals = useMemo(() => {
 		let subtotal = 0;
 		let totalDiscount = 0;
 		let totalGST = 0;
@@ -136,12 +136,16 @@ const CreateQuote = () => {
 		});
 
 		const grandTotal = subtotal - totalDiscount + totalGST;
+		return { subtotal, totalDiscount, totalGST, grandTotal };
+	}, [watchedItems]);
 
-		form.setValue('subtotal', subtotal, { shouldValidate: false });
-		form.setValue('totalDiscount', totalDiscount, { shouldValidate: false });
-		form.setValue('totalGST', totalGST, { shouldValidate: false });
-		form.setValue('grandTotal', grandTotal, { shouldValidate: false });
-	}, [watchedItems, form]);
+	// Sync totals with form state
+	useEffect(() => {
+		form.setValue('subtotal', totals.subtotal);
+		form.setValue('totalDiscount', totals.totalDiscount);
+		form.setValue('totalGST', totals.totalGST);
+		form.setValue('grandTotal', totals.grandTotal);
+	}, [totals, form]);
 
 	const customerForm = useForm<CustomerFormData>({
 		resolver: zodResolver(customerSchema),
