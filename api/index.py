@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import sys
 
-# Ensure the local 'src' directory is importable
+# Ensure the local 'src' directory is importable on Vercel
 sys.path.append(os.path.dirname(__file__))
 
 from src.routes import auth, data, analytics
@@ -19,16 +19,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register Routers
-# Register Routers
-app.include_router(auth.router)
-app.include_router(data.router)
-app.include_router(analytics.router)
+# On Vercel, the rewrite sends /api/customers -> api/index.py
+# but FastAPI still sees the FULL original path /api/customers.
+# So we must register routers WITH the /api prefix here.
+app.include_router(auth.router, prefix="/api")
+app.include_router(data.router, prefix="/api")
+app.include_router(analytics.router, prefix="/api")
 
 @app.get("/")
+@app.get("/api")
 async def root():
-    return {"message": "RentFlow FastAPI Backend is running in modular mode"}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    return {"message": "RentFlow FastAPI Backend is running"}
