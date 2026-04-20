@@ -139,14 +139,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .eq('email', email)
-        .single();
+        .eq('email', email);
 
-      if (error || !data) return false;
-      if (data.password !== pass) return false;
+      if (error) {
+        console.error('Login query error:', error);
+        return false;
+      }
 
-      setUser({ email: data.email, name: data.name });
-      return true;
+      const user = data?.find((u: Record<string, string>) => u.password === pass);
+      if (user) {
+        setUser({ email: user.email, name: user.name });
+        return true;
+      }
     } catch (err) {
       console.error('Login error:', err);
     }
