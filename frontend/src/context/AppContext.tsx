@@ -5,7 +5,7 @@ import { AppContext, AppContextType, Invoice, Quote, Customer, MasterItem, Payme
 import { toast } from 'sonner';
 
 const API_URL = import.meta.env.PROD 
-    ? '/api' 
+    ? '/server' 
     : 'http://localhost:8000';
 
 const STORAGE_KEYS = {
