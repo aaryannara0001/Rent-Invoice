@@ -76,6 +76,7 @@ const CreateQuote = () => {
 	});
 
 	const watchedItems = form.watch('items');
+	const watchedValues = form.watch(); // Watch all values for the preview
 	const watchedCustomerId = form.watch('customerId');
 
 	// Load quote if editing
@@ -573,7 +574,7 @@ const CreateQuote = () => {
 									</div>
 									<div className="flex justify-between text-white font-bold text-xl border-t border-white/10 pt-4 mt-2">
 										<span>Grand Total:</span>
-										<span className="text-primary tracking-tight">₹{form.watch('grandTotal').toFixed(2)}</span>
+										<span className="text-primary tracking-tight">₹{totals.grandTotal.toFixed(2)}</span>
 									</div>
 								</div>
 							</CardContent>
@@ -715,7 +716,7 @@ const CreateQuote = () => {
 				{/* Hidden Preview for PDF Generation */}
 				<div className="fixed -left-[9999px] top-0 pointer-events-none opacity-0">
 					<QuotePreview 
-						quote={form.getValues() as any} 
+						quote={watchedValues as any} 
 						id={id || 'preview'} 
 					/>
 				</div>
@@ -747,7 +748,7 @@ const CreateQuote = () => {
 									</Button>
 								</div>
 								<div className="overflow-y-visible">
-									<QuotePreview quote={form.getValues() as any} id={id || 'preview'} />
+									<QuotePreview quote={watchedValues as any} id={id || 'preview'} />
 								</div>
 							</motion.div>
 						</motion.div>
