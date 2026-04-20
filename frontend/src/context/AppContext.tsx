@@ -3,299 +3,392 @@
 import React, { useState, useEffect } from 'react';
 import { AppContext, AppContextType, Invoice, Quote, Customer, MasterItem, PaymentMethod, User } from './types';
 import { toast } from 'sonner';
+import { supabase } from '../lib/supabase';
 
-const API_URL = import.meta.env.PROD 
-    ? '/api' 
-    : 'http://localhost:8000';
+// Helper: map flat DB row back to Invoice shape
+const rowToInvoice = (row: Record<string, unknown>): Invoice => {
+  if (row.data) return row.data as Invoice; // legacy blob format
+  return {
+    id: row.id as string,
+    invoiceNumber: row.invoice_number as string,
+    customerId: row.customer_id as string,
+    customerName: row.customer_name as string,
+    customerPhone: row.customer_phone as string,
+    customerEmail: '',
+    customerAddress: '',
+    customerGstin: '',
+    invoiceDate: row.invoice_date as string,
+    dueDate: row.due_date as string,
+    subtotal: Number(row.subtotal ?? 0),
+    totalDiscount: Number(row.total_discount ?? 0),
+    totalGST: Number(row.total_gst ?? 0),
+    grandTotal: Number(row.grand_total ?? 0),
+    status: (row.status as string) ?? 'draft',
+    items: (row.items as Invoice['items']) ?? [],
+    eventName: '',
+    eventLocation: '',
+    notes: '',
+    createdAt: row.created_at as string,
+    updatedAt: row.created_at as string,
+  };
+};
 
-const STORAGE_KEYS = {
-	INVOICES: 'rental_invoices',
-	QUOTES: 'rental_quotes',
-	CUSTOMERS: 'rental_customers',
-	MASTER_ITEMS: 'rental_master_items',
-	PAYMENT_METHODS: 'rental_payment_methods',
-	AUTH: 'rental_auth_session',
+const rowToQuote = (row: Record<string, unknown>): Quote => {
+  if (row.data) return row.data as Quote;
+  return {
+    id: row.id as string,
+    quoteNumber: row.quote_number as string,
+    customerId: row.customer_id as string,
+    customerName: row.customer_name as string,
+    customerPhone: '',
+    customerEmail: '',
+    customerAddress: '',
+    customerGstin: '',
+    quoteDate: row.quote_date as string,
+    validUntil: row.valid_until as string,
+    subtotal: 0,
+    totalDiscount: 0,
+    totalGST: 0,
+    grandTotal: Number(row.grand_total ?? 0),
+    status: (row.status as string) ?? 'draft',
+    items: (row.items as Quote['items']) ?? [],
+    eventName: '',
+    eventLocation: '',
+    notes: '',
+    createdAt: row.created_at as string,
+    updatedAt: row.created_at as string,
+  };
+};
+
+const rowToCustomer = (row: Record<string, unknown>): Customer => {
+  if (row.data) return row.data as Customer;
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    phone: (row.phone as string) ?? '',
+    email: (row.email as string) ?? '',
+    address: (row.address as string) ?? '',
+    gstin: (row.gstin as string) ?? '',
+    createdAt: row.created_at as string,
+    updatedAt: row.created_at as string,
+  };
+};
+
+const rowToItem = (row: Record<string, unknown>): MasterItem => {
+  if (row.data) return row.data as MasterItem;
+  return {
+    id: row.id as string,
+    name: (row.name as string) ?? '',
+    pricePerDay: Number(row.price_per_day ?? 0),
+    gstPercent: Number(row.gst_percent ?? 0),
+    category: (row.category as string) ?? '',
+    description: '',
+    createdAt: row.created_at as string,
+    updatedAt: row.created_at as string,
+  };
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-	const [invoices, setInvoices] = useState<Invoice[]>([]);
-	const [quotes, setQuotes] = useState<Quote[]>([]);
-	const [customers, setCustomers] = useState<Customer[]>([]);
-	const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
-	const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-	const [user, setUser] = useState<User | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [user, setUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('rental_auth_session');
+    return saved ? JSON.parse(saved) : null;
+  });
 
-	const isAuthenticated = !!user;
+  const isAuthenticated = !!user;
 
-	// Load from Supabase and localStorage on mount
-	useEffect(() => {
-		const loadData = async () => {
-			// Try localStorage first for instant load
-			const savedInvoices = localStorage.getItem(STORAGE_KEYS.INVOICES);
-			const savedQuotes = localStorage.getItem(STORAGE_KEYS.QUOTES);
-			const savedCustomers = localStorage.getItem(STORAGE_KEYS.CUSTOMERS);
-			const savedMasterItems = localStorage.getItem(STORAGE_KEYS.MASTER_ITEMS);
-			const savedPaymentMethods = localStorage.getItem(STORAGE_KEYS.PAYMENT_METHODS);
-			const savedAuth = localStorage.getItem(STORAGE_KEYS.AUTH);
+  // Load all data from Supabase on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [invsRes, qtsRes, custsRes, itemsRes, methodsRes] = await Promise.all([
+          supabase.from('invoices').select('*').order('created_at', { ascending: false }),
+          supabase.from('quotes').select('*').order('created_at', { ascending: false }),
+          supabase.from('customers').select('*').order('created_at', { ascending: false }),
+          supabase.from('master_items').select('*'),
+          supabase.from('payment_methods').select('*'),
+        ]);
 
-			if (savedInvoices) setInvoices(JSON.parse(savedInvoices));
-			if (savedQuotes) setQuotes(JSON.parse(savedQuotes));
-			if (savedCustomers) setCustomers(JSON.parse(savedCustomers));
-			if (savedMasterItems) setMasterItems(JSON.parse(savedMasterItems));
-			if (savedPaymentMethods) setPaymentMethods(JSON.parse(savedPaymentMethods));
-			if (savedAuth) setUser(JSON.parse(savedAuth));
+        if (invsRes.data) setInvoices(invsRes.data.map(rowToInvoice));
+        if (qtsRes.data) setQuotes(qtsRes.data.map(rowToQuote));
+        if (custsRes.data) setCustomers(custsRes.data.map(rowToCustomer));
+        if (itemsRes.data) setMasterItems(itemsRes.data.map(rowToItem));
+        if (methodsRes.data) setPaymentMethods(
+          methodsRes.data.map(r => (r.data ? r.data : r) as PaymentMethod)
+        );
+      } catch (error) {
+        console.error('Error loading data from Supabase:', error);
+      }
+    };
+    loadData();
+  }, []);
 
-			// Fetch from FastAPI Backend as source of truth
-			try {
-				const [usersRes, invsRes, qtsRes, custsRes, itemsRes, methodsRes] = await Promise.all([
-					fetch(`${API_URL}/auth/me`),
-					fetch(`${API_URL}/invoices`),
-					fetch(`${API_URL}/quotes`),
-					fetch(`${API_URL}/customers`),
-					fetch(`${API_URL}/items`),
-					fetch(`${API_URL}/payment-methods`),
-				]);
+  // Persist auth session
+  useEffect(() => {
+    if (user) localStorage.setItem('rental_auth_session', JSON.stringify(user));
+    else localStorage.removeItem('rental_auth_session');
+  }, [user]);
 
-				if (usersRes.ok) {
-					const userData = await usersRes.json();
-					if (userData) setUser(userData);
-				}
-				if (invsRes.ok) setInvoices(await invsRes.json());
-				if (qtsRes.ok) setQuotes(await qtsRes.json());
-				if (custsRes.ok) setCustomers(await custsRes.json());
-				if (itemsRes.ok) setMasterItems(await itemsRes.json());
-				if (methodsRes.ok) setPaymentMethods(await methodsRes.json());
-			} catch (error) {
-				console.error('Error fetching from Backend:', error);
-			}
-		};
+  // Auth
+  const login = async (email: string, pass: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .single();
 
-		loadData();
-	}, []);
+      if (error || !data) return false;
+      if (data.password !== pass) return false;
 
-	// Persistence Effects (Local + Backend)
-	useEffect(() => { 
-		localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
-		const syncInvoices = async () => {
-			for (const inv of invoices) {
-				await fetch(`${API_URL}/invoices`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ id: inv.id, data: inv })
-				});
-			}
-		};
-		syncInvoices();
-	}, [invoices]);
+      setUser({ email: data.email, name: data.name });
+      return true;
+    } catch (err) {
+      console.error('Login error:', err);
+    }
+    return false;
+  };
 
-	useEffect(() => { 
-		localStorage.setItem(STORAGE_KEYS.QUOTES, JSON.stringify(quotes)); 
-		const syncQuotes = async () => {
-			for (const q of quotes) {
-				await fetch(`${API_URL}/quotes`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ id: q.id, data: q })
-				});
-			}
-		};
-		syncQuotes();
-	}, [quotes]);
+  const logout = () => setUser(null);
 
-	useEffect(() => { 
-		localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers)); 
-		const syncCustomers = async () => {
-			for (const c of customers) {
-				await fetch(`${API_URL}/customers`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ id: c.id, data: c })
-				});
-			}
-		};
-		syncCustomers();
-	}, [customers]);
+  // Invoice operations
+  const addInvoice = async (invoice: Invoice) => {
+    setInvoices(prev => [...prev, invoice]);
+    await supabase.from('invoices').upsert({
+      id: invoice.id,
+      invoice_number: invoice.invoiceNumber,
+      customer_id: invoice.customerId,
+      customer_name: invoice.customerName,
+      customer_phone: invoice.customerPhone,
+      invoice_date: invoice.invoiceDate,
+      due_date: invoice.dueDate,
+      subtotal: invoice.subtotal,
+      total_discount: invoice.totalDiscount,
+      total_gst: invoice.totalGST,
+      grand_total: invoice.grandTotal,
+      status: invoice.status,
+      items: invoice.items,
+    });
+  };
 
-	useEffect(() => { 
-		localStorage.setItem(STORAGE_KEYS.MASTER_ITEMS, JSON.stringify(masterItems)); 
-		const syncItems = async () => {
-			for (const i of masterItems) {
-				await fetch(`${API_URL}/items`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ id: i.id, data: i })
-				});
-			}
-		};
-		syncItems();
-	}, [masterItems]);
+  const updateInvoice = async (id: string, updated: Invoice) => {
+    setInvoices(prev => prev.map(inv => (inv.id === id ? updated : inv)));
+    await supabase.from('invoices').upsert({
+      id: updated.id,
+      invoice_number: updated.invoiceNumber,
+      customer_id: updated.customerId,
+      customer_name: updated.customerName,
+      customer_phone: updated.customerPhone,
+      invoice_date: updated.invoiceDate,
+      due_date: updated.dueDate,
+      subtotal: updated.subtotal,
+      total_discount: updated.totalDiscount,
+      total_gst: updated.totalGST,
+      grand_total: updated.grandTotal,
+      status: updated.status,
+      items: updated.items,
+    });
+  };
 
-	useEffect(() => { 
-		localStorage.setItem(STORAGE_KEYS.PAYMENT_METHODS, JSON.stringify(paymentMethods)); 
-		const syncMethods = async () => {
-			for (const m of paymentMethods) {
-				await fetch(`${API_URL}/payment-methods`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ id: m.id, data: m })
-				});
-			}
-		};
-		syncMethods();
-	}, [paymentMethods]);
+  const deleteInvoice = async (id: string) => {
+    setInvoices(prev => prev.filter(inv => inv.id !== id));
+    await supabase.from('invoices').delete().eq('id', id);
+  };
 
-	useEffect(() => {
-		if (user) {
-			localStorage.setItem(STORAGE_KEYS.AUTH, JSON.stringify(user));
-			fetch(`${API_URL}/auth/profile`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(user)
-			});
-		}
-		else localStorage.removeItem(STORAGE_KEYS.AUTH);
-	}, [user]);
+  const getInvoice = (id: string) => invoices.find(inv => inv.id === id);
 
-	// Auth operations
-	const login = async (email: string, pass: string) => {
-		try {
-			const res = await fetch(`${API_URL}/auth/login`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ email, password: pass })
-			});
+  // Quote operations
+  const addQuote = async (quote: Quote) => {
+    setQuotes(prev => [...prev, quote]);
+    await supabase.from('quotes').upsert({
+      id: quote.id,
+      quote_number: quote.quoteNumber,
+      customer_id: quote.customerId,
+      customer_name: quote.customerName,
+      quote_date: quote.quoteDate,
+      valid_until: quote.validUntil,
+      grand_total: quote.grandTotal,
+      status: quote.status,
+      items: quote.items,
+    });
+  };
 
-			if (!res.ok) return false;
+  const updateQuote = async (id: string, updated: Quote) => {
+    setQuotes(prev => prev.map(q => (q.id === id ? updated : q)));
+    await supabase.from('quotes').upsert({
+      id: updated.id,
+      quote_number: updated.quoteNumber,
+      customer_id: updated.customerId,
+      customer_name: updated.customerName,
+      quote_date: updated.quoteDate,
+      valid_until: updated.validUntil,
+      grand_total: updated.grandTotal,
+      status: updated.status,
+      items: updated.items,
+    });
+  };
 
-			const userProfile = await res.json();
-			setUser(userProfile);
-			return true;
-		} catch (err) {
-			console.error('Login error:', err);
-		}
-		return false;
-	};
+  const deleteQuote = async (id: string) => {
+    setQuotes(prev => prev.filter(q => q.id !== id));
+    await supabase.from('quotes').delete().eq('id', id);
+  };
 
-	const logout = () => {
-		setUser(null);
-	};
+  const getQuote = (id: string) => quotes.find(q => q.id === id);
 
-	// Invoice operations
-	const addInvoice = (invoice: Invoice) => setInvoices([...invoices, invoice]);
-	const updateInvoice = (id: string, updatedInvoice: Invoice) => setInvoices(invoices.map(inv => (inv.id === id ? updatedInvoice : inv)));
-	const deleteInvoice = async (id: string) => {
-		setInvoices(invoices.filter(inv => inv.id !== id));
-		await fetch(`${API_URL}/invoices/${id}`, { method: 'DELETE' });
-	};
-	const getInvoice = (id: string) => invoices.find(inv => inv.id === id);
+  const convertQuoteToInvoice = (quoteId: string) => {
+    const quote = getQuote(quoteId);
+    if (!quote) return null;
+    const invoiceId = `INV-${Date.now()}`;
+    const invoice: Invoice = {
+      id: invoiceId,
+      customerId: quote.customerId,
+      customerName: quote.customerName,
+      customerPhone: quote.customerPhone,
+      customerEmail: quote.customerEmail,
+      customerAddress: quote.customerAddress,
+      customerGstin: quote.customerGstin,
+      invoiceNumber: invoiceId,
+      invoiceDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      items: quote.items,
+      subtotal: quote.subtotal,
+      totalDiscount: quote.totalDiscount,
+      totalGST: quote.totalGST,
+      grandTotal: quote.grandTotal,
+      status: 'pending',
+      eventName: quote.eventName,
+      eventLocation: quote.eventLocation,
+      notes: quote.notes,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      quoteId,
+    };
+    addInvoice(invoice);
+    updateQuote(quoteId, { ...quote, status: 'converted', updatedAt: new Date().toISOString() });
+    return invoice;
+  };
 
-	// Quote operations
-	const addQuote = (quote: Quote) => setQuotes([...quotes, quote]);
-	const updateQuote = (id: string, updatedQuote: Quote) => setQuotes(quotes.map(q => (q.id === id ? updatedQuote : q)));
-	const deleteQuote = async (id: string) => {
-		setQuotes(quotes.filter(q => q.id !== id));
-		await fetch(`${API_URL}/quotes/${id}`, { method: 'DELETE' });
-	};
-	const getQuote = (id: string) => quotes.find(q => q.id === id);
+  // Customer operations
+  const addCustomer = async (customer: Customer) => {
+    setCustomers(prev => [...prev, customer]);
+    await supabase.from('customers').upsert({
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      email: customer.email,
+      address: customer.address,
+      gstin: customer.gstin,
+    });
+  };
 
-	const convertQuoteToInvoice = (quoteId: string) => {
-		const quote = getQuote(quoteId);
-		if (!quote) return null;
+  const updateCustomer = async (id: string, updated: Customer) => {
+    setCustomers(prev => prev.map(c => (c.id === id ? updated : c)));
+    await supabase.from('customers').upsert({
+      id: updated.id,
+      name: updated.name,
+      phone: updated.phone,
+      email: updated.email,
+      address: updated.address,
+      gstin: updated.gstin,
+    });
+  };
 
-		const invoiceId = `INV-${Date.now()}`;
-		const invoice: Invoice = {
-			id: invoiceId,
-			customerId: quote.customerId,
-			customerName: quote.customerName,
-			customerPhone: quote.customerPhone,
-			customerEmail: quote.customerEmail,
-			customerAddress: quote.customerAddress,
-			customerGstin: quote.customerGstin,
-			invoiceNumber: invoiceId,
-			invoiceDate: new Date().toISOString().split('T')[0],
-			dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-			items: quote.items,
-			subtotal: quote.subtotal,
-			totalDiscount: quote.totalDiscount,
-			totalGST: quote.totalGST,
-			grandTotal: quote.grandTotal,
-			status: 'pending',
-			eventName: quote.eventName,
-			eventLocation: quote.eventLocation,
-			notes: quote.notes,
-			createdAt: new Date().toISOString(),
-			updatedAt: new Date().toISOString(),
-			quoteId,
-		};
+  const deleteCustomer = async (id: string) => {
+    setCustomers(prev => prev.filter(c => c.id !== id));
+    await supabase.from('customers').delete().eq('id', id);
+  };
 
-		addInvoice(invoice);
-		updateQuote(quoteId, { ...quote, status: 'converted', updatedAt: new Date().toISOString() });
-		return invoice;
-	};
+  const getCustomer = (id: string) => customers.find(c => c.id === id);
 
-	// Customer operations
-	const addCustomer = (customer: Customer) => setCustomers([...customers, customer]);
-	const updateCustomer = (id: string, updatedCustomer: Customer) => setCustomers(customers.map(cust => (cust.id === id ? updatedCustomer : cust)));
-	const deleteCustomer = async (id: string) => {
-		setCustomers(customers.filter(cust => cust.id !== id));
-		await fetch(`${API_URL}/customers/${id}`, { method: 'DELETE' });
-	};
-	const getCustomer = (id: string) => customers.find(cust => cust.id === id);
+  // Master Item operations
+  const addMasterItem = async (item: MasterItem) => {
+    setMasterItems(prev => [...prev, item]);
+    await supabase.from('master_items').upsert({
+      id: item.id,
+      name: item.name,
+      price_per_day: item.pricePerDay,
+      gst_percent: item.gstPercent,
+      category: item.category,
+    });
+  };
 
-	// Master Item operations
-	const addMasterItem = (item: MasterItem) => setMasterItems([...masterItems, item]);
-	const updateMasterItem = (id: string, updatedItem: MasterItem) => setMasterItems(masterItems.map(item => (item.id === id ? updatedItem : item)));
-	const deleteMasterItem = async (id: string) => {
-		setMasterItems(masterItems.filter(item => item.id !== id));
-		await fetch(`${API_URL}/items/${id}`, { method: 'DELETE' });
-	};
-	const getMasterItem = (id: string) => masterItems.find(item => item.id === id);
+  const updateMasterItem = async (id: string, updated: MasterItem) => {
+    setMasterItems(prev => prev.map(item => (item.id === id ? updated : item)));
+    await supabase.from('master_items').upsert({
+      id: updated.id,
+      name: updated.name,
+      price_per_day: updated.pricePerDay,
+      gst_percent: updated.gstPercent,
+      category: updated.category,
+    });
+  };
 
-	// Payment Method operations
-	const addPaymentMethod = (method: PaymentMethod) => {
-		if (method.isDefault) {
-			setPaymentMethods([...paymentMethods.map(m => ({ ...m, isDefault: false })), method]);
-		} else {
-			setPaymentMethods([...paymentMethods, method]);
-		}
-	};
-	const updatePaymentMethod = (id: string, updatedMethod: PaymentMethod) => setPaymentMethods(paymentMethods.map(m => (m.id === id ? updatedMethod : (updatedMethod.isDefault ? { ...m, isDefault: false } : m))));
-	const deletePaymentMethod = async (id: string) => {
-		setPaymentMethods(paymentMethods.filter(m => m.id !== id));
-		await fetch(`${API_URL}/payment-methods/${id}`, { method: 'DELETE' });
-	};
-	const getPaymentMethod = (id: string) => paymentMethods.find(m => m.id === id);
-	const setDefaultPaymentMethod = (id: string) => setPaymentMethods(paymentMethods.map(m => ({ ...m, isDefault: m.id === id })));
+  const deleteMasterItem = async (id: string) => {
+    setMasterItems(prev => prev.filter(item => item.id !== id));
+    await supabase.from('master_items').delete().eq('id', id);
+  };
 
-	// Stats
-	const getTotalRevenue = () => invoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + inv.grandTotal, 0);
-	const getTotalPendingAmount = () => invoices.filter(inv => inv.status === 'pending' || inv.status === 'sent').reduce((sum, inv) => sum + inv.grandTotal, 0);
-	const getTotalPaidAmount = () => getTotalRevenue();
-	const getInvoiceStats = () => ({
-		total: invoices.length,
-		paid: invoices.filter(inv => inv.status === 'paid').length,
-		pending: invoices.filter(inv => inv.status === 'pending' || inv.status === 'sent').length,
-		overdue: invoices.filter(inv => inv.status === 'overdue').length,
-		draft: invoices.filter(inv => inv.status === 'draft').length,
-	});
-	const getQuoteStats = () => ({
-		total: quotes.length,
-		accepted: quotes.filter(q => q.status === 'accepted').length,
-		rejected: quotes.filter(q => q.status === 'rejected').length,
-		converted: quotes.filter(q => q.status === 'converted').length,
-	});
-	const getCustomerInvoices = (customerId: string) => invoices.filter(inv => inv.customerId === customerId);
-	const getCustomerRevenue = (customerId: string) => invoices.filter(inv => inv.customerId === customerId && inv.status === 'paid').reduce((sum, inv) => sum + inv.grandTotal, 0);
+  const getMasterItem = (id: string) => masterItems.find(item => item.id === id);
 
-	const value: AppContextType = {
-		user, login, logout, isAuthenticated,
-		invoices, addInvoice, updateInvoice, deleteInvoice, getInvoice,
-		quotes, addQuote, updateQuote, deleteQuote, getQuote, convertQuoteToInvoice,
-		customers, addCustomer, updateCustomer, deleteCustomer, getCustomer,
-		masterItems, addMasterItem, updateMasterItem, deleteMasterItem, getMasterItem,
-		paymentMethods, addPaymentMethod, updatePaymentMethod, deletePaymentMethod, getPaymentMethod, setDefaultPaymentMethod,
-		getTotalRevenue, getTotalPendingAmount, getTotalPaidAmount, getInvoiceStats, getQuoteStats, getCustomerInvoices, getCustomerRevenue,
-	};
+  // Payment Method operations
+  const addPaymentMethod = async (method: PaymentMethod) => {
+    const updated = method.isDefault
+      ? paymentMethods.map(m => ({ ...m, isDefault: false }))
+      : [...paymentMethods];
+    setPaymentMethods([...updated, method]);
+    await supabase.from('payment_methods').upsert({ id: method.id, data: method });
+  };
 
-	return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  const updatePaymentMethod = async (id: string, updated: PaymentMethod) => {
+    setPaymentMethods(prev =>
+      prev.map(m => (m.id === id ? updated : updated.isDefault ? { ...m, isDefault: false } : m))
+    );
+    await supabase.from('payment_methods').upsert({ id: updated.id, data: updated });
+  };
+
+  const deletePaymentMethod = async (id: string) => {
+    setPaymentMethods(prev => prev.filter(m => m.id !== id));
+    await supabase.from('payment_methods').delete().eq('id', id);
+  };
+
+  const getPaymentMethod = (id: string) => paymentMethods.find(m => m.id === id);
+  const setDefaultPaymentMethod = (id: string) =>
+    setPaymentMethods(prev => prev.map(m => ({ ...m, isDefault: m.id === id })));
+
+  // Stats
+  const getTotalRevenue = () => invoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + inv.grandTotal, 0);
+  const getTotalPendingAmount = () => invoices.filter(inv => inv.status === 'pending' || inv.status === 'sent').reduce((sum, inv) => sum + inv.grandTotal, 0);
+  const getTotalPaidAmount = () => getTotalRevenue();
+  const getInvoiceStats = () => ({
+    total: invoices.length,
+    paid: invoices.filter(inv => inv.status === 'paid').length,
+    pending: invoices.filter(inv => inv.status === 'pending' || inv.status === 'sent').length,
+    overdue: invoices.filter(inv => inv.status === 'overdue').length,
+    draft: invoices.filter(inv => inv.status === 'draft').length,
+  });
+  const getQuoteStats = () => ({
+    total: quotes.length,
+    accepted: quotes.filter(q => q.status === 'accepted').length,
+    rejected: quotes.filter(q => q.status === 'rejected').length,
+    converted: quotes.filter(q => q.status === 'converted').length,
+  });
+  const getCustomerInvoices = (customerId: string) => invoices.filter(inv => inv.customerId === customerId);
+  const getCustomerRevenue = (customerId: string) =>
+    invoices.filter(inv => inv.customerId === customerId && inv.status === 'paid').reduce((sum, inv) => sum + inv.grandTotal, 0);
+
+  const value: AppContextType = {
+    user, login, logout, isAuthenticated,
+    invoices, addInvoice, updateInvoice, deleteInvoice, getInvoice,
+    quotes, addQuote, updateQuote, deleteQuote, getQuote, convertQuoteToInvoice,
+    customers, addCustomer, updateCustomer, deleteCustomer, getCustomer,
+    masterItems, addMasterItem, updateMasterItem, deleteMasterItem, getMasterItem,
+    paymentMethods, addPaymentMethod, updatePaymentMethod, deletePaymentMethod, getPaymentMethod, setDefaultPaymentMethod,
+    getTotalRevenue, getTotalPendingAmount, getTotalPaidAmount, getInvoiceStats, getQuoteStats, getCustomerInvoices, getCustomerRevenue,
+  };
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
