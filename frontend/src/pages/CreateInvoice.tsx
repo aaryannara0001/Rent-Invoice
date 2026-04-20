@@ -650,15 +650,15 @@ const CreateInvoice = () => {
 								<div className="space-y-3">
 									<div className="flex justify-between text-gray-400">
 										<span>Subtotal:</span>
-										<span>₹{form.watch('subtotal').toFixed(2)}</span>
+										<span>₹{totals.subtotal.toFixed(2)}</span>
 									</div>
 									<div className="flex justify-between text-red-400">
 										<span>Total Discount:</span>
-										<span>- ₹{form.watch('totalDiscount').toFixed(2)}</span>
+										<span>- ₹{totals.totalDiscount.toFixed(2)}</span>
 									</div>
 									<div className="flex justify-between text-blue-400">
 										<span>Total GST:</span>
-										<span>+ ₹{form.watch('totalGST').toFixed(2)}</span>
+										<span>+ ₹{totals.totalGST.toFixed(2)}</span>
 									</div>
 									<div className="flex justify-between text-white font-bold text-xl border-t border-white/10 pt-4 mt-2">
 										<span>Grand Total:</span>
