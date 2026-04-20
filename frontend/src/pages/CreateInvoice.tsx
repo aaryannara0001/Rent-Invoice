@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Minus, Save, Trash2, Download, Eye, X, Package, Search, Check, ChevronsUpDown } from 'lucide-react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -77,8 +77,8 @@ const CreateInvoice = () => {
 		name: 'items',
 	});
 
-	const watchedItems = form.watch('items');
-	const watchedValues = form.watch(); // Watch all values for the preview
+	const watchedItems = useWatch({ control: form.control, name: 'items' });
+	const watchedValues = form.watch(); // Watch all values for top-level changes
 	const watchedCustomerId = form.watch('customerId');
 
 	// Load invoice if editing
