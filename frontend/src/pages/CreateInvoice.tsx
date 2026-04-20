@@ -191,10 +191,10 @@ const CreateInvoice = () => {
 	const handleSelectItemFromCatalog = (masterItem: MasterItem, indexOverride?: number) => {
 		const targetIndex = indexOverride !== undefined ? indexOverride : activeItemIndex;
 		if (targetIndex !== null) {
-			form.setValue(`items.${targetIndex}.itemName`, masterItem.name, { shouldValidate: false });
-			form.setValue(`items.${targetIndex}.description`, masterItem.description || '', { shouldValidate: false });
-			form.setValue(`items.${targetIndex}.pricePerDay`, masterItem.pricePerDay, { shouldValidate: false });
-			form.setValue(`items.${targetIndex}.gstPercent`, masterItem.gstPercent, { shouldValidate: false });
+			form.setValue(`items.${targetIndex}.itemName`, masterItem.name, { shouldDirty: true, shouldTouch: true });
+			form.setValue(`items.${targetIndex}.description`, masterItem.description || '', { shouldDirty: true, shouldTouch: true });
+			form.setValue(`items.${targetIndex}.pricePerDay`, masterItem.pricePerDay, { shouldDirty: true, shouldTouch: true });
+			form.setValue(`items.${targetIndex}.gstPercent`, masterItem.gstPercent, { shouldDirty: true, shouldTouch: true });
 			
 			setShowItemSelector(false);
 			setActiveItemIndex(null);
