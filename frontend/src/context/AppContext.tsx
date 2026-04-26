@@ -362,26 +362,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetPassword = async (email: string, newPassword: string): Promise<boolean> => {
-    // Update password and mark as no longer temp
-    setUsers(prev => prev.map(u => (u.email === email ? { ...u, is_temp_password: false } : u)));
+    // Update Supabase FIRST, then sync local state only on success
     const { error } = await supabase.from('users').update({
       password: newPassword,
       is_temp_password: false,
     }).eq('email', email);
     
     if (error) {
+      console.error('Error resetting password:', error);
       toast.error('Error resetting password');
       return false;
     }
     
-    // Update current user session if it's the logged-in user
+    // Only update local state after DB confirms success
+    setUsers(prev => prev.map(u => (u.email === email ? { ...u, is_temp_password: false } : u)));
+    
+    // Update current session so ProtectedRoute stops redirecting to reset page
     if (user?.email === email) {
       const updatedUser = { ...user, is_temp_password: false };
       setUser(updatedUser);
       localStorage.setItem('rental_auth_session', JSON.stringify(updatedUser));
     }
     
-    toast.success('Password updated successfully');
+    toast.success('Password updated! You can now log in with your new password.');
     return true;
   };
 

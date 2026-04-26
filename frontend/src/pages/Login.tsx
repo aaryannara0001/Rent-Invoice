@@ -5,9 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import { supabase } from '@/lib/supabase';
+import { generateTempPassword } from '@/utils/passwordUtils';
+import { sendTempPasswordEmail } from '@/services/emailService';
 
 const Login = () => {
 	const navigate = useNavigate();
@@ -16,16 +20,19 @@ const Login = () => {
 	const [password, setPassword] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
 
+	// Forgot Password state
+	const [forgotOpen, setForgotOpen] = useState(false);
+	const [forgotEmail, setForgotEmail] = useState('');
+	const [isForgotLoading, setIsForgotLoading] = useState(false);
+
 	const handleLogin = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setIsLoading(true);
 		
-		// Artificial delay for premium feel
 		await new Promise(r => setTimeout(r, 800));
 		
 		const success = await login(email, password);
 		if (success) {
-			// Check if this is a temporary password login
 			const userStr = localStorage.getItem('rental_auth_session');
 			if (userStr) {
 				const user = JSON.parse(userStr);
@@ -42,6 +49,64 @@ const Login = () => {
 			toast.error('Invalid email or password');
 		}
 		setIsLoading(false);
+	};
+
+	const handleForgotPassword = async (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!forgotEmail) {
+			toast.error('Please enter your email address');
+			return;
+		}
+
+		setIsForgotLoading(true);
+
+		try {
+			// Check if user exists in our custom users table
+			const { data, error } = await supabase
+				.from('users')
+				.select('name, email')
+				.eq('email', forgotEmail)
+				.single();
+
+			if (error || !data) {
+				toast.error('No account found with that email address');
+				setIsForgotLoading(false);
+				return;
+			}
+
+			// Generate a new temp password
+			const newTempPassword = generateTempPassword();
+
+			// Update Supabase with the new temp password
+			const { error: updateError } = await supabase
+				.from('users')
+				.update({ password: newTempPassword, is_temp_password: true })
+				.eq('email', forgotEmail);
+
+			if (updateError) {
+				toast.error('Failed to reset password. Please try again.');
+				setIsForgotLoading(false);
+				return;
+			}
+
+			// Try to send email (best-effort — user still gets the password in the toast)
+			try {
+				await sendTempPasswordEmail(data.email, data.name, newTempPassword);
+				toast.success('A new temporary password has been sent to your email!');
+			} catch {
+				// Email failed but password is reset — show it to the admin
+				toast.error(`Email failed. Your new temp password is: ${newTempPassword}`, {
+					duration: 15000,
+				});
+			}
+
+			setForgotOpen(false);
+			setForgotEmail('');
+		} catch (err) {
+			toast.error('Something went wrong. Please try again.');
+		}
+
+		setIsForgotLoading(false);
 	};
 
 	return (
@@ -92,7 +157,13 @@ const Login = () => {
 							<div className="space-y-2">
 								<div className="flex items-center justify-between ml-1">
 									<Label htmlFor="password" className="text-gray-300">Password</Label>
-									<button type="button" className="text-[10px] text-primary hover:underline uppercase tracking-wider font-semibold">Forgot?</button>
+									<button
+										type="button"
+										onClick={() => setForgotOpen(true)}
+										className="text-[10px] text-primary hover:underline uppercase tracking-wider font-semibold"
+									>
+										Forgot?
+									</button>
 								</div>
 								<div className="relative group">
 									<Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 group-focus-within:text-primary transition-colors" />
@@ -122,12 +193,6 @@ const Login = () => {
 								)}
 							</Button>
 						</form>
-
-						<div className="mt-8 pt-6 border-t border-white/5 text-center">
-							<p className="text-sm text-gray-500 italic">
-								Hint: nishunara862@gmail.com / 12345678
-							</p>
-						</div>
 					</CardContent>
 				</Card>
 				
@@ -135,6 +200,61 @@ const Login = () => {
 					&copy; 2026 Digital Rent Flow. All rights reserved.
 				</p>
 			</motion.div>
+
+			{/* Forgot Password Dialog */}
+			<Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+				<DialogContent className="bg-[#111827] border-[#1F2937] text-white">
+					<DialogHeader>
+						<DialogTitle className="text-white flex items-center gap-2">
+							<Mail className="h-5 w-5 text-primary" />
+							Reset Password
+						</DialogTitle>
+						<DialogDescription className="text-gray-400">
+							Enter your email address. We'll send you a new temporary password to log back in.
+						</DialogDescription>
+					</DialogHeader>
+
+					<form onSubmit={handleForgotPassword} className="space-y-4 mt-2">
+						<div className="space-y-2">
+							<Label htmlFor="forgot-email" className="text-gray-300">Email Address</Label>
+							<div className="relative">
+								<Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+								<Input
+									id="forgot-email"
+									type="email"
+									placeholder="name@example.com"
+									value={forgotEmail}
+									onChange={(e) => setForgotEmail(e.target.value)}
+									required
+									className="bg-black/40 border-white/10 pl-10 h-12 text-white placeholder:text-gray-600 focus:border-primary/50 rounded-xl"
+								/>
+							</div>
+						</div>
+
+						<DialogFooter className="gap-2">
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setForgotOpen(false)}
+								className="border-[#1F2937] text-gray-300 hover:bg-[#1F2937]"
+							>
+								Cancel
+							</Button>
+							<Button
+								type="submit"
+								disabled={isForgotLoading}
+								className="bg-primary hover:bg-primary/90 text-white font-semibold"
+							>
+								{isForgotLoading ? (
+									<><Loader2 className="h-4 w-4 animate-spin mr-2" />Sending...</>
+								) : (
+									'Send Reset Password'
+								)}
+							</Button>
+						</DialogFooter>
+					</form>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 };
