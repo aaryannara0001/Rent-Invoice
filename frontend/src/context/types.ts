@@ -105,6 +105,7 @@ export interface Customer {
 export interface User {
 	email: string;
 	name: string;
+	is_temp_password?: boolean;
 }
 
 export interface AppContextType {
@@ -126,10 +127,16 @@ export interface AppContextType {
 	deleteQuote: (id: string) => void;
 	getQuote: (id: string) => Quote | undefined;
 	convertQuoteToInvoice: (quoteId: string) => Invoice | null;
+	users: User[];
+	role: string;
 	addCustomer: (customer: Customer) => void;
 	updateCustomer: (id: string, customer: Customer) => void;
 	deleteCustomer: (id: string) => void;
 	getCustomer: (id: string) => Customer | undefined;
+	addUser: (user: User & { password?: string }) => Promise<string | undefined>;
+	updateUser: (email: string, user: User) => void;
+	deleteUser: (email: string) => void;
+	resetPassword: (email: string, newPassword: string) => Promise<boolean>;
 	addMasterItem: (item: MasterItem) => void;
 	updateMasterItem: (id: string, item: MasterItem) => void;
 	deleteMasterItem: (id: string) => void;

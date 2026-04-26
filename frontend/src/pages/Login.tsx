@@ -25,7 +25,18 @@ const Login = () => {
 		
 		const success = await login(email, password);
 		if (success) {
-			toast.success('Welcome back, Aaryan!');
+			// Check if this is a temporary password login
+			const userStr = localStorage.getItem('rental_auth_session');
+			if (userStr) {
+				const user = JSON.parse(userStr);
+				if (user.is_temp_password) {
+					toast.success('Welcome! Please set up your password.');
+					navigate('/reset-password');
+					setIsLoading(false);
+					return;
+				}
+			}
+			toast.success('Welcome back!');
 			navigate('/');
 		} else {
 			toast.error('Invalid email or password');
@@ -80,7 +91,7 @@ const Login = () => {
 							</div>
 							<div className="space-y-2">
 								<div className="flex items-center justify-between ml-1">
-									<Label htmlFor="password" text-gray-300>Password</Label>
+									<Label htmlFor="password" className="text-gray-300">Password</Label>
 									<button type="button" className="text-[10px] text-primary hover:underline uppercase tracking-wider font-semibold">Forgot?</button>
 								</div>
 								<div className="relative group">

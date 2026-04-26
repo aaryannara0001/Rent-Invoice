@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { AppContext, AppContextType, Invoice, Quote, Customer, MasterItem, PaymentMethod, User } from './types';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
+import { generateTempPassword } from '../utils/passwordUtils';
 
 // Helper: map flat DB row back to Invoice shape
 const rowToInvoice = (row: Record<string, unknown>): Invoice => {
@@ -23,7 +24,7 @@ const rowToInvoice = (row: Record<string, unknown>): Invoice => {
     totalDiscount: Number(row.total_discount ?? 0),
     totalGST: Number(row.total_gst ?? 0),
     grandTotal: Number(row.grand_total ?? 0),
-    status: (row.status as string) ?? 'draft',
+    status: (row.status as Invoice['status']) ?? 'draft',
     items: (row.items as Invoice['items']) ?? [],
     eventName: '',
     eventLocation: '',
@@ -50,7 +51,7 @@ const rowToQuote = (row: Record<string, unknown>): Quote => {
     totalDiscount: 0,
     totalGST: 0,
     grandTotal: Number(row.grand_total ?? 0),
-    status: (row.status as string) ?? 'draft',
+    status: (row.status as Quote['status']) ?? 'draft',
     items: (row.items as Quote['items']) ?? [],
     eventName: '',
     eventLocation: '',
@@ -94,6 +95,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [role] = useState<string>('editor'); // Default to editor for now
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('rental_auth_session');
     return saved ? JSON.parse(saved) : null;
@@ -105,12 +108,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [invsRes, qtsRes, custsRes, itemsRes, methodsRes] = await Promise.all([
+        const [invsRes, qtsRes, custsRes, itemsRes, methodsRes, usersRes] = await Promise.all([
           supabase.from('invoices').select('*').order('created_at', { ascending: false }),
           supabase.from('quotes').select('*').order('created_at', { ascending: false }),
           supabase.from('customers').select('*').order('created_at', { ascending: false }),
           supabase.from('master_items').select('*'),
           supabase.from('payment_methods').select('*'),
+          supabase.from('users').select('*'),
         ]);
 
         if (invsRes.data) setInvoices(invsRes.data.map(rowToInvoice));
@@ -120,6 +124,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (methodsRes.data) setPaymentMethods(
           methodsRes.data.map(r => (r.data ? r.data : r) as PaymentMethod)
         );
+        if (usersRes.data) setUsers(usersRes.data.map(u => ({ email: u.email, name: u.name, is_temp_password: u.is_temp_password })));
       } catch (error) {
         console.error('Error loading data from Supabase:', error);
       }
@@ -146,9 +151,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return false;
       }
 
-      const user = data?.find((u: Record<string, string>) => u.password === pass);
-      if (user) {
-        setUser({ email: user.email, name: user.name });
+      const userRow = data?.find((u: Record<string, any>) => u.password === pass);
+      if (userRow) {
+        setUser({ 
+          email: userRow.email, 
+          name: userRow.name, 
+          is_temp_password: userRow.is_temp_password 
+        });
         return true;
       }
     } catch (err) {
@@ -308,6 +317,74 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const getCustomer = (id: string) => customers.find(c => c.id === id);
 
+  // User management
+  const addUser = async (newUser: User & { password?: string }): Promise<string | undefined> => {
+    const passwordToUse = newUser.password || generateTempPassword();
+    
+    // Add to local state first for optimistic UI (but maybe wait for Supabase to be safer)
+    // setUsers(prev => [...prev, { ...newUser, is_temp_password: true }]);
+    
+    const { error } = await supabase.from('users').insert({
+      email: newUser.email,
+      name: newUser.name,
+      password: passwordToUse,
+      is_temp_password: true,
+    });
+    
+    if (error) {
+      console.error('Supabase error adding user:', error);
+      if (error.code === 'PGRST204' || error.message?.includes('is_temp_password')) {
+        toast.error('Database Error: The "is_temp_password" column is missing. Please run the SQL fix in Supabase dashboard.');
+      } else {
+        toast.error(`Error adding user: ${error.message}`);
+      }
+      return undefined;
+    } else {
+      setUsers(prev => [...prev, { email: newUser.email, name: newUser.name, is_temp_password: true }]);
+      toast.success(`User created in database!`);
+      return passwordToUse;
+    }
+  };
+
+  const updateUser = async (email: string, updated: User) => {
+    setUsers(prev => prev.map(u => (u.email === email ? updated : u)));
+    const { error } = await supabase.from('users').update({
+      name: updated.name,
+      email: updated.email,
+    }).eq('email', email);
+    if (error) toast.error('Error updating user');
+  };
+
+  const deleteUser = async (email: string) => {
+    setUsers(prev => prev.filter(u => u.email !== email));
+    const { error } = await supabase.from('users').delete().eq('email', email);
+    if (error) toast.error('Error deleting user');
+  };
+
+  const resetPassword = async (email: string, newPassword: string): Promise<boolean> => {
+    // Update password and mark as no longer temp
+    setUsers(prev => prev.map(u => (u.email === email ? { ...u, is_temp_password: false } : u)));
+    const { error } = await supabase.from('users').update({
+      password: newPassword,
+      is_temp_password: false,
+    }).eq('email', email);
+    
+    if (error) {
+      toast.error('Error resetting password');
+      return false;
+    }
+    
+    // Update current user session if it's the logged-in user
+    if (user?.email === email) {
+      const updatedUser = { ...user, is_temp_password: false };
+      setUser(updatedUser);
+      localStorage.setItem('rental_auth_session', JSON.stringify(updatedUser));
+    }
+    
+    toast.success('Password updated successfully');
+    return true;
+  };
+
   // Master Item operations
   const addMasterItem = async (item: MasterItem) => {
     setMasterItems(prev => [...prev, item]);
@@ -389,6 +466,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     invoices, addInvoice, updateInvoice, deleteInvoice, getInvoice,
     quotes, addQuote, updateQuote, deleteQuote, getQuote, convertQuoteToInvoice,
     customers, addCustomer, updateCustomer, deleteCustomer, getCustomer,
+    users, addUser, updateUser, deleteUser, resetPassword, role,
     masterItems, addMasterItem, updateMasterItem, deleteMasterItem, getMasterItem,
     paymentMethods, addPaymentMethod, updatePaymentMethod, deletePaymentMethod, getPaymentMethod, setDefaultPaymentMethod,
     getTotalRevenue, getTotalPendingAmount, getTotalPaidAmount, getInvoiceStats, getQuoteStats, getCustomerInvoices, getCustomerRevenue,

@@ -30,25 +30,23 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+frontend/.env
+backend/.env
+
+# Scratch and temp files
+scratch/
+database_schema.sql
+*.md
+
 # Node / package
-node_modules
-package-lock.json
-
-# Build
-dist
-dist-ssr
+node_modules/
+dist/
+dist-ssr/
 *.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Misc
-frontend/bun.lock
