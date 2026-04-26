@@ -24,8 +24,15 @@ import { Navigate } from "react-router-dom";
 import { useApp } from "@/context/useApp";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-	const { isAuthenticated } = useApp();
+	const { isAuthenticated, user } = useApp();
+	
 	if (!isAuthenticated) return <Navigate to="/login" replace />;
+	
+	// Force password reset if user is using a temporary password
+	if (user?.is_temp_password) {
+		return <Navigate to="/reset-password" replace />;
+	}
+	
 	return <>{children}</>;
 };
 
